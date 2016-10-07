@@ -84,14 +84,21 @@ func upload(ctx context.Context, sto *storage.Client, c clip) error {
 		if err != nil {
 			return err
 		}
-		log.Printf("Closing %v", fn)
 		if err := w.Close(); err != nil {
 			return err
 		}
-		// log.Printf("Updating attrs for %v", fn)
-		// _, err = vob.Update(ctx, attrs)
-		// return err
-		return nil
+		for i := 0; i < 5; i++ {
+			_, err = vob.Update(ctx, attrs)
+			if err == nil {
+				if i > 0 {
+					log.Printf("Succeeded on attempt %v", i+1)
+				}
+				return nil
+			}
+			log.Printf("Error storing attrs for %v: %v (attempt %v)", fn, err, i+1)
+			time.Sleep(time.Duration(i) * time.Second)
+		}
+		return err
 	}
 
 	grp.Go(func() error { return up(c.vid.Name(), vob, vattrs) })
@@ -143,8 +150,8 @@ func main() {
 	}
 
 	for id, clip := range clips {
-		log.Printf("%v -> %v", id, clip)
 		if clip.thumb != nil && clip.vid != nil {
+			log.Printf("%v -> %v", id, clip)
 			if err := upload(ctx, sto, clip); err != nil {
 				log.Fatalf("Error uploading: %v", err)
 			}
