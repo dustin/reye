@@ -23,9 +23,11 @@ import (
 const clipTimeFmt = "20060102150405"
 
 var (
-	cleanup  = flag.Bool("cleanup", false, "remove stuff when done")
-	camid    = flag.String("camid", "", "Camera ID")
-	authFile = flag.String("authfile", "", "Path to auth json file")
+	cleanupFlag = flag.Bool("cleanup", false, "remove stuff when done")
+	camid       = flag.String("camid", "", "Camera ID")
+	authFile    = flag.String("authfile", "", "Path to auth json file")
+
+	basePath string
 )
 
 type clip struct {
@@ -75,7 +77,7 @@ func upload(ctx context.Context, sto *storage.Client, c clip) error {
 	}
 
 	up := func(fn string, ob *storage.ObjectHandle, attrs storage.ObjectAttrs) error {
-		f, err := os.Open(path.Join(flag.Arg(0), fn))
+		f, err := os.Open(path.Join(basePath, fn))
 		if err != nil {
 			return err
 		}
@@ -115,6 +117,22 @@ func initStorageClient(ctx context.Context) *storage.Client {
 	return client
 }
 
+func cleanup(c clip) error {
+	if !*cleanupFlag {
+		return nil
+	}
+
+	if err := os.Remove(path.Join(basePath, c.thumb.Name())); err != nil {
+		return err
+	}
+
+	if err := os.Remove(path.Join(basePath, c.vid.Name())); err != nil {
+		return err
+	}
+
+	return nil
+}
+
 func main() {
 	flag.Parse()
 
@@ -122,9 +140,11 @@ func main() {
 
 	sto := initStorageClient(ctx)
 
-	d, err := os.Open(flag.Arg(0))
+	basePath = flag.Arg(0)
+
+	d, err := os.Open(basePath)
 	if err != nil {
-		log.Fatalf("Can't open %v: %v", flag.Arg(0), err)
+		log.Fatalf("Can't open %v: %v", basePath, err)
 	}
 	dents, err := d.Readdir(-1)
 	if err != nil {
@@ -154,6 +174,9 @@ func main() {
 			log.Printf("%v -> %v", id, clip)
 			if err := upload(ctx, sto, clip); err != nil {
 				log.Fatalf("Error uploading: %v", err)
+			}
+			if err := cleanup(clip); err != nil {
+				log.Fatalf("Error cleaning up: %v", err)
 			}
 		}
 	}
