@@ -4,6 +4,7 @@ import (
 	"flag"
 	"fmt"
 	"log"
+	"log/syslog"
 	"os"
 	"strconv"
 	"strings"
@@ -28,6 +29,8 @@ var (
 	cleanupFlag = flag.Bool("cleanup", false, "remove stuff when done")
 	camid       = flag.String("camid", "", "Camera ID")
 	authFile    = flag.String("authfile", "", "Path to auth json file")
+	interval    = flag.Duration("duration", 30*time.Second, "How frequently to rescan")
+	useSyslog   = flag.Bool("syslog", false, "Log to syslog")
 
 	basePath string
 )
@@ -126,15 +129,7 @@ func cleanup(c clip) error {
 	return nil
 }
 
-func main() {
-	flag.Parse()
-
-	ctx := context.Background()
-
-	sto := initStorageClient(ctx)
-
-	basePath = flag.Arg(0)
-
+func uploadAll(ctx context.Context, sto *storage.Client) {
 	d, err := os.Open(basePath)
 	if err != nil {
 		log.Fatalf("Can't open %v: %v", basePath, err)
@@ -173,4 +168,32 @@ func main() {
 			}
 		}
 	}
+}
+
+func main() {
+	flag.Parse()
+
+	if *useSyslog {
+		sl, err := syslog.New(syslog.LOG_INFO, "uploader")
+		if err != nil {
+			log.Fatalf("Can't initialize syslog: %v", err)
+		}
+		log.SetOutput(sl)
+		log.SetFlags(0)
+	}
+
+	ctx := context.Background()
+
+	sto := initStorageClient(ctx)
+
+	basePath = flag.Arg(0)
+
+	uploadAll(ctx, sto)
+
+	if *interval > 0 {
+		for range time.Tick(*interval) {
+			uploadAll(ctx, sto)
+		}
+	}
+
 }
