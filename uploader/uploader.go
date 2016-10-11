@@ -10,6 +10,8 @@ import (
 	"time"
 	"unicode"
 
+	"github.com/dustin/go-humanize"
+
 	"cloud.google.com/go/storage"
 	"google.golang.org/api/option"
 
@@ -36,8 +38,8 @@ type clip struct {
 }
 
 func (c clip) String() string {
-	return fmt.Sprintf("vid: %v, thumb: %v @ ts=%v", c.vid.Name(), c.thumb.Name(),
-		c.ts.Format(time.RFC3339))
+	return fmt.Sprintf("vid: %v, thumb: %v @ ts=%v (%v)", c.vid.Name(), c.thumb.Name(),
+		c.ts.Format(time.RFC3339), humanize.Bytes(uint64(c.vid.Size()+c.thumb.Size())))
 }
 
 func parseClipInfo(name string) (int, time.Time) {
