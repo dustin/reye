@@ -62,7 +62,7 @@ func upload(ctx context.Context, sto *storage.Client, c clip) error {
 
 	bucket := sto.Bucket("scenic-arc.appspot.com")
 	vob := bucket.Object(path.Join(*camid, c.ts.Format(clipTimeFmt)+".mp4"))
-	vattrs := storage.ObjectAttrsToUpdate{
+	vattrs := storage.ObjectAttrs{
 		ContentType: "video/mp4",
 		Metadata: map[string]string{
 			"captured": c.ts.Format(time.RFC3339),
@@ -70,7 +70,7 @@ func upload(ctx context.Context, sto *storage.Client, c clip) error {
 		},
 	}
 	tob := bucket.Object(path.Join(*camid, c.ts.Format(clipTimeFmt)+".jpg"))
-	tattrs := storage.ObjectAttrsToUpdate{
+	tattrs := storage.ObjectAttrs{
 		ContentType: "image/jpeg",
 		Metadata: map[string]string{
 			"captured": c.ts.Format(time.RFC3339),
@@ -78,31 +78,21 @@ func upload(ctx context.Context, sto *storage.Client, c clip) error {
 		},
 	}
 
-	up := func(fn string, ob *storage.ObjectHandle, attrs storage.ObjectAttrsToUpdate) error {
+	up := func(fn string, ob *storage.ObjectHandle, attrs storage.ObjectAttrs) error {
+		defer func(t time.Time) {
+			log.Printf("Finished uploading %v in %v", fn, time.Since(t))
+		}(time.Now())
 		f, err := os.Open(path.Join(basePath, fn))
 		if err != nil {
 			return err
 		}
 		w := ob.NewWriter(ctx)
+		w.ObjectAttrs = attrs
 		_, err = io.Copy(w, f)
 		if err != nil {
 			return err
 		}
-		if err := w.Close(); err != nil {
-			return err
-		}
-		for i := 0; i < 5; i++ {
-			_, err = vob.Update(ctx, attrs)
-			if err == nil {
-				if i > 0 {
-					log.Printf("Succeeded on attempt %v", i+1)
-				}
-				return nil
-			}
-			log.Printf("Error storing attrs for %v: %v (attempt %v)", fn, err, i+1)
-			time.Sleep(time.Duration(i) * time.Second)
-		}
-		return err
+		return w.Close()
 	}
 
 	grp.Go(func() error { return up(c.vid.Name(), vob, vattrs) })
