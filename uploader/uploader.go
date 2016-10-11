@@ -62,7 +62,7 @@ func upload(ctx context.Context, sto *storage.Client, c clip) error {
 
 	bucket := sto.Bucket("scenic-arc.appspot.com")
 	vob := bucket.Object(path.Join(*camid, c.ts.Format(clipTimeFmt)+".mp4"))
-	vattrs := storage.ObjectAttrs{
+	vattrs := storage.ObjectAttrsToUpdate{
 		ContentType: "video/mp4",
 		Metadata: map[string]string{
 			"captured": c.ts.Format(time.RFC3339),
@@ -70,7 +70,7 @@ func upload(ctx context.Context, sto *storage.Client, c clip) error {
 		},
 	}
 	tob := bucket.Object(path.Join(*camid, c.ts.Format(clipTimeFmt)+".jpg"))
-	tattrs := storage.ObjectAttrs{
+	tattrs := storage.ObjectAttrsToUpdate{
 		ContentType: "image/jpeg",
 		Metadata: map[string]string{
 			"captured": c.ts.Format(time.RFC3339),
@@ -78,7 +78,7 @@ func upload(ctx context.Context, sto *storage.Client, c clip) error {
 		},
 	}
 
-	up := func(fn string, ob *storage.ObjectHandle, attrs storage.ObjectAttrs) error {
+	up := func(fn string, ob *storage.ObjectHandle, attrs storage.ObjectAttrsToUpdate) error {
 		f, err := os.Open(path.Join(basePath, fn))
 		if err != nil {
 			return err
