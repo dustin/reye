@@ -109,6 +109,7 @@ func upload(ctx context.Context, sto *storage.Client, c clip) error {
 	}
 
 	grp.Go(func() error { return up(c.vid.Name(), vob, vattrs) })
+	grp.Go(func() error { return up(c.ovid.Name(), ovob, ovattrs) })
 	grp.Go(func() error { return up(c.thumb.Name(), tob, tattrs) })
 
 	return grp.Wait()
@@ -173,7 +174,7 @@ func uploadAll(ctx context.Context, sto *storage.Client) {
 	}
 
 	for id, clip := range clips {
-		if clip.thumb != nil && clip.vid != nil {
+		if clip.thumb != nil && clip.vid != nil && clip.ovid != nil {
 			log.Printf("%v -> %v", id, clip)
 			if err := upload(ctx, sto, clip); err != nil {
 				log.Fatalf("Error uploading: %v", err)
