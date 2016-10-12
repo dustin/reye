@@ -144,6 +144,12 @@ func cleanup(c clip) error {
 		return err
 	}
 
+	if c.ovid != nil {
+		if err := os.Remove(path.Join(basePath, c.ovid.Name())); err != nil {
+			return err
+		}
+	}
+
 	return nil
 }
 
