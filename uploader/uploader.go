@@ -153,20 +153,21 @@ func uploadAll(ctx context.Context, sto *storage.Client) {
 
 	for _, dent := range dents {
 		log.Printf("read %v (%v bytes)", dent.Name(), dent.Size())
-		if strings[0] == '.' {
+		dname := dent.Name()
+		if dname[0] == '.' {
 			// ignore dot files
-		} else if strings.HasSuffix(dent.Name(), ".mp4") || strings.HasSuffix(".avi") {
-			id, ts := parseClipInfo(dent.Name())
+		} else if strings.HasSuffix(dname, ".mp4") || strings.HasSuffix(dname, ".avi") {
+			id, ts := parseClipInfo(dname)
 			c := clips[id]
-			if strings.HasSuffix(".mp4") {
+			if strings.HasSuffix(dname, ".mp4") {
 				c.vid = dent
 			} else {
 				c.ovid = dent
 			}
 			c.ts = ts
 			clips[id] = c
-		} else if strings.HasSuffix(dent.Name(), ".jpg") {
-			id, _ := parseClipInfo(dent.Name())
+		} else if strings.HasSuffix(dname, ".jpg") {
+			id, _ := parseClipInfo(dname)
 			c := clips[id]
 			c.thumb = dent
 			clips[id] = c
