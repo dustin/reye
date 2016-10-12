@@ -41,8 +41,12 @@ type clip struct {
 }
 
 func (c clip) String() string {
+	size := c.vid.Size() + c.thumb.Size()
+	if c.ovid != nil {
+		size += c.ovid.Size()
+	}
 	return fmt.Sprintf("vid: %v, thumb: %v @ ts=%v (%v)", c.vid.Name(), c.thumb.Name(),
-		c.ts.Format(time.RFC3339), humanize.Bytes(uint64(c.vid.Size()+c.thumb.Size())))
+		c.ts.Format(time.RFC3339), humanize.Bytes(uint64(size)))
 }
 
 func parseClipInfo(name string) (int, time.Time) {
@@ -64,31 +68,6 @@ func upload(ctx context.Context, sto *storage.Client, c clip) error {
 	grp, _ := errgroup.WithContext(ctx)
 
 	bucket := sto.Bucket("scenic-arc.appspot.com")
-	vob := bucket.Object(path.Join(*camid, c.ts.Format(clipTimeFmt)+".mp4"))
-	vattrs := storage.ObjectAttrs{
-		ContentType: "video/mp4",
-		Metadata: map[string]string{
-			"captured": c.ts.Format(time.RFC3339),
-			"camera":   *camid,
-		},
-	}
-	ovob := bucket.Object(path.Join(*camid, c.ts.Format(clipTimeFmt)+".avi"))
-	ovattrs := storage.ObjectAttrs{
-		ContentType: "video/avi",
-		Metadata: map[string]string{
-			"captured": c.ts.Format(time.RFC3339),
-			"camera":   *camid,
-		},
-	}
-
-	tob := bucket.Object(path.Join(*camid, c.ts.Format(clipTimeFmt)+".jpg"))
-	tattrs := storage.ObjectAttrs{
-		ContentType: "image/jpeg",
-		Metadata: map[string]string{
-			"captured": c.ts.Format(time.RFC3339),
-			"camera":   *camid,
-		},
-	}
 
 	up := func(fn string, ob *storage.ObjectHandle, attrs storage.ObjectAttrs) error {
 		defer func(t time.Time) {
@@ -108,9 +87,38 @@ func upload(ctx context.Context, sto *storage.Client, c clip) error {
 		return w.Close()
 	}
 
+	vob := bucket.Object(path.Join(*camid, c.ts.Format(clipTimeFmt)+".mp4"))
+	vattrs := storage.ObjectAttrs{
+		ContentType: "video/mp4",
+		Metadata: map[string]string{
+			"captured": c.ts.Format(time.RFC3339),
+			"camera":   *camid,
+		},
+	}
+
 	grp.Go(func() error { return up(c.vid.Name(), vob, vattrs) })
-	grp.Go(func() error { return up(c.ovid.Name(), ovob, ovattrs) })
+
+	tob := bucket.Object(path.Join(*camid, c.ts.Format(clipTimeFmt)+".jpg"))
+	tattrs := storage.ObjectAttrs{
+		ContentType: "image/jpeg",
+		Metadata: map[string]string{
+			"captured": c.ts.Format(time.RFC3339),
+			"camera":   *camid,
+		},
+	}
 	grp.Go(func() error { return up(c.thumb.Name(), tob, tattrs) })
+
+	if c.ovid != nil {
+		ovob := bucket.Object(path.Join(*camid, c.ts.Format(clipTimeFmt)+".avi"))
+		ovattrs := storage.ObjectAttrs{
+			ContentType: "video/avi",
+			Metadata: map[string]string{
+				"captured": c.ts.Format(time.RFC3339),
+				"camera":   *camid,
+			},
+		}
+		grp.Go(func() error { return up(c.ovid.Name(), ovob, ovattrs) })
+	}
 
 	return grp.Wait()
 }
@@ -175,7 +183,7 @@ func uploadAll(ctx context.Context, sto *storage.Client) {
 	}
 
 	for id, clip := range clips {
-		if clip.thumb != nil && clip.vid != nil && clip.ovid != nil {
+		if clip.thumb != nil && clip.vid != nil {
 			log.Printf("%v -> %v", id, clip)
 			if err := upload(ctx, sto, clip); err != nil {
 				log.Fatalf("Error uploading: %v", err)
