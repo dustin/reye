@@ -36,8 +36,8 @@ var (
 )
 
 type clip struct {
-	thumb, vid os.FileInfo
-	ts         time.Time
+	thumb, vid, ovid os.FileInfo
+	ts               time.Time
 }
 
 func (c clip) String() string {
@@ -72,6 +72,15 @@ func upload(ctx context.Context, sto *storage.Client, c clip) error {
 			"camera":   *camid,
 		},
 	}
+	ovob := bucket.Object(path.Join(*camid, c.ts.Format(clipTimeFmt)+".avi"))
+	ovattrs := storage.ObjectAttrs{
+		ContentType: "video/avi",
+		Metadata: map[string]string{
+			"captured": c.ts.Format(time.RFC3339),
+			"camera":   *camid,
+		},
+	}
+
 	tob := bucket.Object(path.Join(*camid, c.ts.Format(clipTimeFmt)+".jpg"))
 	tattrs := storage.ObjectAttrs{
 		ContentType: "image/jpeg",
@@ -145,10 +154,14 @@ func uploadAll(ctx context.Context, sto *storage.Client) {
 		log.Printf("read %v (%v bytes)", dent.Name(), dent.Size())
 		if strings[0] == '.' {
 			// ignore dot files
-		} else if strings.HasSuffix(dent.Name(), ".mp4") {
+		} else if strings.HasSuffix(dent.Name(), ".mp4") || strings.HasSuffix(".avi") {
 			id, ts := parseClipInfo(dent.Name())
 			c := clips[id]
-			c.vid = dent
+			if strings.HasSuffix(".mp4") {
+				c.vid = dent
+			} else {
+				c.ovid = dent
+			}
 			c.ts = ts
 			clips[id] = c
 		} else if strings.HasSuffix(dent.Name(), ".jpg") {
