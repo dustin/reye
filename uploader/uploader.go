@@ -191,9 +191,10 @@ func uploadAll(ctx context.Context, sto *storage.Client) {
 	for id, clip := range clips {
 		if clip.thumb != nil && clip.vid != nil {
 			if clip.ovid != nil && int64((float64(clip.vid.Size())*0.9)) < clip.ovid.Size() {
-				log.Printf("%v is %v and %v is %v -- too small, skipping",
+				log.Printf("%v is %v and %v is %v -- too small (%.1f%%), skipping",
 					clip.vid.Name(), humanize.Bytes(uint64(clip.vid.Size())),
-					clip.ovid.Name(), humanize.Bytes(uint64(clip.ovid.Size())))
+					clip.ovid.Name(), humanize.Bytes(uint64(clip.ovid.Size())),
+					float64(clip.vid.Size())/float64(clip.ovid.Size())*100)
 				continue
 			}
 			log.Printf("%v -> %v", id, clip)
