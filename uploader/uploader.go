@@ -166,7 +166,6 @@ func uploadAll(ctx context.Context, sto *storage.Client) {
 	clips := map[int]clip{}
 
 	for _, dent := range dents {
-		log.Printf("read %v (%v bytes)", dent.Name(), dent.Size())
 		dname := dent.Name()
 		if dname[0] == '.' {
 			// ignore dot files
