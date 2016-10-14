@@ -193,11 +193,10 @@ func uploadAll(ctx context.Context, sto *storage.Client) {
 			if clip.ovid != nil {
 				relsize := float64(clip.vid.Size()) / float64(clip.ovid.Size()) * 100
 				if relsize < 60 {
-					log.Printf("%v is %v and %v is %v -- too small (%.1f%%), skipping",
+					log.Printf("Warning: %v is %v and %v is %v -- too small (%.1f%%)",
 						clip.vid.Name(), humanize.Bytes(uint64(clip.vid.Size())),
 						clip.ovid.Name(), humanize.Bytes(uint64(clip.ovid.Size())),
 						relsize)
-					continue
 				}
 			}
 			log.Printf("%v -> %v", id, clip)
