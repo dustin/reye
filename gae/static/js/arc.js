@@ -25,6 +25,11 @@ eye = angular.module('eye', ['ngRoute']).
             }]);
 
 function homeController($scope, $http) {
+    $scope.recent = [];
+    $scope.base = "https://storage.cloud.google.com/scenic-arc.appspot.com/basement";
+    $http.get("//scenic-arc.appspot.com/api/recentImages").success(function(data) {
+        $scope.recent = data;
+    });
 }
 
 eye.controller('IndexCtrl', ['$scope', '$http', homeController]);

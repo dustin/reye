@@ -1,1 +1,6 @@
-<p>data go here</p>
+<div ng-repeat="i in recent track by $index" class="event">
+  <span class="ts" title="{{i.ts}}">{{i.ts|relDate}}</span>
+  <a href="{{base}}/{{i.fn}}.mp4">
+    <img src="{{base}}/{{i.fn}}.jpg"></img>
+  </a>
+</div>

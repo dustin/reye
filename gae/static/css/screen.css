@@ -5,3 +5,15 @@ body {
 table tbody th {
     text-align: left;
 }
+
+.event {
+    float: left;
+}
+
+.event .ts {
+    display: block;
+}
+
+.event img {
+    width: 320px;
+}
