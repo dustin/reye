@@ -1,0 +1,5 @@
+cron:
+- description: Update the clips
+  url: /batch/scan
+  schedule: every 30 minutes
+  timezone: US/Pacific
