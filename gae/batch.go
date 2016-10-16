@@ -89,7 +89,7 @@ func handleBatchScan(w http.ResponseWriter, r *http.Request) {
 					continue
 				}
 			}
-			log.Infof(c, "Adding %v in %v: %v (%#v)", fp[0], camkey, t, ob)
+			log.Infof(c, "Adding %v in %v: %v", fp[0], camkey, t)
 
 			keystodo = append(keystodo, datastore.NewKey(c, "Event", pp[0]+"/"+fp[0], 0, nil))
 			valstodo = append(valstodo, &Event{
