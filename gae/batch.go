@@ -45,6 +45,8 @@ func handleBatchScan(w http.ResponseWriter, r *http.Request) {
 			k, err := it.Next(nil)
 			if err == datastore.Done {
 				break
+			} else if err != nil {
+				return err
 			}
 			camkeys[k.StringID()] = k
 		}
@@ -52,14 +54,17 @@ func handleBatchScan(w http.ResponseWriter, r *http.Request) {
 	})
 
 	grp.Go(func() error {
-		q = datastore.NewQuery("Camera").KeysOnly()
+		q := datastore.NewQuery("Event").KeysOnly()
 		for it := q.Run(c); ; {
 			k, err := it.Next(nil)
 			if err == datastore.Done {
 				break
+			} else if err != nil {
+				return err
 			}
 			evkeys[k.StringID()] = true
 		}
+		return nil
 	})
 
 	client, err := storage.NewClient(c)
@@ -114,11 +119,11 @@ func handleBatchScan(w http.ResponseWriter, r *http.Request) {
 					continue
 				}
 			}
-			log.Infof(c, "Adding %v in %v: %v", fp[0], camkey, t)
-
 			evkey := datastore.NewKey(c, "Event", pp[0]+"/"+fp[0], 0, nil)
 
 			if !evkeys[evkey.StringID()] {
+				log.Infof(c, "Adding %v in %v: %v", fp[0], camkey, t)
+
 				keystodo = append(keystodo, evkey)
 				valstodo = append(valstodo, &Event{
 					Camera:    camkey,
@@ -131,21 +136,29 @@ func handleBatchScan(w http.ResponseWriter, r *http.Request) {
 	}
 	log.Infof(c, "Completed listing of %d items", todo)
 
+	grp, _ = errgroup.WithContext(c)
+
 	for len(keystodo) > 0 {
 		n := len(keystodo)
 		if n >= 500 {
 			n = 500
 		}
-		_, err = datastore.PutMulti(c, keystodo[:n], valstodo[:n])
-		if err != nil {
-			log.Errorf(c, "Error storing items: %v", err)
-			http.Error(w, err.Error(), 500)
-			return
-		}
+		tk := keystodo[:n]
+		tv := valstodo[:n]
+		grp.Go(func() error {
+			_, err = datastore.PutMulti(c, tk, tv)
+			return err
+		})
 		log.Infof(c, "Stored %v items", n)
 		keystodo = keystodo[n:]
 		valstodo = valstodo[n:]
 	}
 
-	w.Write([]byte("ok"))
+	if err := grp.Wait(); err != nil {
+		log.Errorf(c, "Error storing items: %v", err)
+		http.Error(w, err.Error(), 500)
+		return
+	}
+
+	w.WriteHeader(204)
 }
