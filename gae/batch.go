@@ -4,6 +4,8 @@ import (
 	"net/http"
 	"strings"
 
+	"golang.org/x/sync/errgroup"
+
 	"time"
 
 	"cloud.google.com/go/storage"
@@ -32,15 +34,33 @@ func init() {
 func handleBatchScan(w http.ResponseWriter, r *http.Request) {
 	c := appengine.NewContext(r)
 
-	q := datastore.NewQuery("Camera").KeysOnly()
-	keys := map[string]*datastore.Key{}
-	for it := q.Run(c); ; {
-		k, err := it.Next(nil)
-		if err == datastore.Done {
-			break
+	camkeys := map[string]*datastore.Key{}
+	evkeys := map[string]bool{}
+
+	grp, _ := errgroup.WithContext(c)
+
+	grp.Go(func() error {
+		q := datastore.NewQuery("Camera").KeysOnly()
+		for it := q.Run(c); ; {
+			k, err := it.Next(nil)
+			if err == datastore.Done {
+				break
+			}
+			camkeys[k.StringID()] = k
 		}
-		keys[k.StringID()] = k
-	}
+		return nil
+	})
+
+	grp.Go(func() error {
+		q = datastore.NewQuery("Camera").KeysOnly()
+		for it := q.Run(c); ; {
+			k, err := it.Next(nil)
+			if err == datastore.Done {
+				break
+			}
+			evkeys[k.StringID()] = true
+		}
+	})
 
 	client, err := storage.NewClient(c)
 	if err != nil {
@@ -74,8 +94,13 @@ func handleBatchScan(w http.ResponseWriter, r *http.Request) {
 		}
 		if ob.ContentType == "image/jpeg" {
 			// basement/20161013173815.jpg
+			if err := grp.Wait(); err != nil {
+				log.Errorf(c, "failed to get default GCS bucket name: %v", err)
+				http.Error(w, err.Error(), 500)
+				return
+			}
 			pp := strings.Split(ob.Name, "/")
-			camkey, ok := keys[pp[0]]
+			camkey, ok := camkeys[pp[0]]
 			if !ok {
 				log.Warningf(c, "Unhandled key: %v from %v", pp[0], ob.Name)
 				continue
@@ -91,13 +116,17 @@ func handleBatchScan(w http.ResponseWriter, r *http.Request) {
 			}
 			log.Infof(c, "Adding %v in %v: %v", fp[0], camkey, t)
 
-			keystodo = append(keystodo, datastore.NewKey(c, "Event", pp[0]+"/"+fp[0], 0, nil))
-			valstodo = append(valstodo, &Event{
-				Camera:    camkey,
-				Timestamp: t,
-				Filename:  fp[0],
-			})
-			todo++
+			evkey := datastore.NewKey(c, "Event", pp[0]+"/"+fp[0], 0, nil)
+
+			if !evkeys[evkey.StringID()] {
+				keystodo = append(keystodo, evkey)
+				valstodo = append(valstodo, &Event{
+					Camera:    camkey,
+					Timestamp: t,
+					Filename:  fp[0],
+				})
+				todo++
+			}
 		}
 	}
 	log.Infof(c, "Completed listing of %d items", todo)
