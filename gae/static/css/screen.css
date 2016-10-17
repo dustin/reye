@@ -12,6 +12,7 @@ table tbody th {
 
 .event .ts {
     display: block;
+    font-size: small;
 }
 
 .event img {
