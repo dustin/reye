@@ -133,6 +133,21 @@ func getOrigDuration(ctx context.Context, bucket *storage.BucketHandle, c *clip)
 	if c.mp4 == nil {
 		return 0, fmt.Errorf("no mp4 found")
 	}
+	obj := bucket.Object(c.mp4.Name)
+	attrs, err := obj.Attrs(ctx)
+	if err != nil {
+		return 0, err
+	}
+	if attrs.Metadata["duration"] != "" {
+		return time.ParseDuration(attrs.Metadata["duration"])
+	}
+
+	r, err := obj.NewReader(ctx)
+	if err != nil {
+		return 0, err
+	}
+	defer r.Close()
+
 	oname := url.QueryEscape(c.mp4.Name)
 	tmpf, err := os.Create(oname)
 	if err != nil {
@@ -140,12 +155,6 @@ func getOrigDuration(ctx context.Context, bucket *storage.BucketHandle, c *clip)
 	}
 	defer tmpf.Close()
 	defer os.Remove(oname)
-	obj := bucket.Object(c.mp4.Name)
-	r, err := obj.NewReader(ctx)
-	if err != nil {
-		return 0, err
-	}
-	defer r.Close()
 	return getClipDuration(oname)
 }
 
