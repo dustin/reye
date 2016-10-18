@@ -1,6 +1,7 @@
 package main
 
 import (
+	"encoding/json"
 	"flag"
 	"fmt"
 	"io"
@@ -16,6 +17,8 @@ import (
 
 	"os/exec"
 
+	"net/url"
+
 	"golang.org/x/net/context"
 )
 
@@ -24,6 +27,7 @@ var (
 	bucketName = flag.String("bucket", "", "Bucket name")
 	minRatio   = flag.Int("minRatio", 40, "Minimum percentage considered valid")
 	ffmpeg     = flag.String("ffmpeg", "ffmpeg", "path to ffmpeg")
+	ffprobe    = flag.String("ffprobe", "ffprobe", "path to ffprobe")
 
 	basePath string
 )
@@ -92,6 +96,33 @@ func initStorageClient(ctx context.Context) *storage.Client {
 	return client
 }
 
+func getClipDuration(fn string) (time.Duration, error) {
+	cmd := exec.Command(*ffprobe, "-v", "quiet", "-print_format", "json",
+		"-show_format", "-show_streams", fn)
+	o, err := cmd.Output()
+	if err != nil {
+		return 0, err
+	}
+	info := struct {
+		Format struct {
+			Duration string
+		}
+	}{}
+
+	if err := json.Unmarshal(o, &info); err != nil {
+		return 0, err
+	}
+
+	return time.ParseDuration(info.Format.Duration + "s")
+}
+
+func abs(d time.Duration) time.Duration {
+	if d < 0 {
+		return -d
+	}
+	return d
+}
+
 func transcode(ctx context.Context, bucket *storage.BucketHandle, c *clip) error {
 	log.Printf("Transcoding %v", c)
 	start := time.Now()
@@ -102,23 +133,47 @@ func transcode(ctx context.Context, bucket *storage.BucketHandle, c *clip) error
 	}
 	defer r.Close()
 
-	tmpname := "tmp.mp4"
+	iname := url.QueryEscape(c.avi.Name)
+	oname := url.QueryEscape(c.mp4.Name)
 
-	cmd := exec.Command(*ffmpeg, "-i", "-", tmpname)
-	cmd.Stdin = r
+	tmpf, err := os.Create(iname)
+	if err != nil {
+		return err
+	}
+	defer tmpf.Close()
+	defer os.Remove(iname)
+	if _, err := io.Copy(tmpf, r); err != nil {
+		return err
+	}
+
+	idur, err := getClipDuration(iname)
+	if err != nil {
+		return err
+	}
+
+	cmd := exec.Command(*ffmpeg, "-i", iname, oname)
 	cmd.Stderr = os.Stderr
 	cmd.Stdout = os.Stdout
 	if err := cmd.Run(); err != nil {
 		return err
 	}
-	defer os.Remove(tmpname)
+	defer os.Remove(oname)
+
+	odur, err := getClipDuration(oname)
+	if err != nil {
+		return err
+	}
+
+	if abs(odur-idur) > time.Second {
+		return fmt.Errorf("durations inconsistent, in=%v, out=%v", idur, odur)
+	}
 
 	dest := bucket.Object(c.mp4.Name)
 	w := dest.NewWriter(ctx)
 	w.ObjectAttrs.Metadata = c.mp4.Metadata
 	w.ObjectAttrs.ContentType = c.mp4.ContentType
 
-	f, err := os.Open(tmpname)
+	f, err := os.Open(oname)
 	if err != nil {
 		return err
 	}
