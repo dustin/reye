@@ -4,6 +4,17 @@ eye = angular.module('eye', ['ngRoute']).
             return moment(dstr).fromNow();
         };
     }).
+    filter('duration', function() {
+        return function(d) {
+            var seconds = d / 1000000000;
+            var minutes = (seconds / 60).toFixed(0);
+            seconds = (seconds % 60).toFixed(0);
+            if (seconds.length == 1) {
+                seconds = "0" + seconds;
+            }
+            return minutes + ":" + seconds;
+        };
+    }).
     filter('calDate', function() {
         return function(dstr) {
             return moment(dstr).calendar();
