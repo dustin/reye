@@ -7,6 +7,7 @@ import (
 	"io"
 	"log"
 	"os"
+	"strings"
 	"time"
 
 	"github.com/dustin/go-humanize"
@@ -97,8 +98,11 @@ func initStorageClient(ctx context.Context) *storage.Client {
 }
 
 func getClipDuration(fn string) (time.Duration, error) {
-	cmd := exec.Command(*ffprobe, "-v", "quiet", "-print_format", "json",
-		"-show_format", "-show_streams", fn)
+	outflag := "-show_format"
+	if strings.HasSuffix(*ffprobe, "avconv") {
+		outflag = "-of"
+	}
+	cmd := exec.Command(*ffprobe, "-v", "quiet", "-print_format", "json", outflag, fn)
 	o, err := cmd.Output()
 	if err != nil {
 		return 0, err
