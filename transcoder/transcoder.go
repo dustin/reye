@@ -128,6 +128,9 @@ func abs(d time.Duration) time.Duration {
 }
 
 func getOrigDuration(ctx context.Context, bucket *storage.BucketHandle, c *clip) (time.Duration, error) {
+	if c.mp4 == nil {
+		return 0, fmt.Errorf("no mp4 found")
+	}
 	oname := url.QueryEscape(c.mp4.Name)
 	tmpf, err := os.Create(oname)
 	if err != nil {
