@@ -98,11 +98,12 @@ func initStorageClient(ctx context.Context) *storage.Client {
 }
 
 func getClipDuration(fn string) (time.Duration, error) {
-	outflag := "-show_format"
-	if strings.HasSuffix(*ffprobe, "avconv") {
-		outflag = "-of"
+	printfmt := "-out_format"
+	if strings.HasSuffix(*ffprobe, "avprobe") {
+		printfmt = "-of"
 	}
-	cmd := exec.Command(*ffprobe, "-v", "quiet", "-print_format", "json", outflag, fn)
+	cmd := exec.Command(*ffprobe, "-v", "quiet", printfmt, "json", "-show_format", fn)
+	cmd.Stderr = os.Stderr
 	o, err := cmd.Output()
 	if err != nil {
 		return 0, err
