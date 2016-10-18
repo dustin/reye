@@ -2,3 +2,5 @@
 /uploader/uploader
 /transcoder/transcoder
 *.json
+*.avi
+*.mp4
