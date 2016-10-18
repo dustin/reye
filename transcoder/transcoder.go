@@ -150,6 +150,8 @@ func getOrigDuration(ctx context.Context, bucket *storage.BucketHandle, c *clip)
 }
 
 func transcode(ctx context.Context, bucket *storage.BucketHandle, c *clip) error {
+	grp, _ := errgroup.WithContext(ctx)
+
 	log.Printf("Transcoding %v", c)
 	start := time.Now()
 	obj := bucket.Object(c.avi.Name)
@@ -177,18 +179,36 @@ func transcode(ctx context.Context, bucket *storage.BucketHandle, c *clip) error
 		return err
 	}
 
-	odur, err := getOrigDuration(ctx, bucket, c)
+	attrs, err := obj.Attrs(ctx)
 	if err != nil {
-		log.Printf("Error getting original clip duration: %v", err)
-		odur = 0
+		return err
+	}
+	if attrs.Metadata["duration"] == "" {
+		grp.Go(func() error {
+			newattrs := storage.ObjectAttrsToUpdate{
+				Metadata: attrs.Metadata,
+			}
+			newattrs.Metadata["duration"] = idur.String()
+			_, err := obj.Update(ctx, newattrs)
+			return err
+		})
 	}
 
-	if abs(odur-idur) < time.Second {
-		log.Printf("Skipping %v, since it's roughly the same size (%v vs. %v)",
-			c, idur, odur)
+	if !*onlyBroken {
+		odur, err := getOrigDuration(ctx, bucket, c)
+		if err != nil {
+			log.Printf("Error getting original clip duration: %v", err)
+			odur = 0
+		}
+
+		if abs(odur-idur) < time.Second {
+			log.Printf("Skipping %v, since it's roughly the same size (%v vs. %v)",
+				c, idur, odur)
+			return nil
+		}
 	}
 
-	cmd := exec.Command(*ffmpeg, "-i", iname, oname)
+	cmd := exec.Command(*ffmpeg, "-v", "warning", "-i", iname, oname)
 	cmd.Stderr = os.Stderr
 	cmd.Stdout = os.Stdout
 	if err := cmd.Run(); err != nil {
@@ -196,7 +216,7 @@ func transcode(ctx context.Context, bucket *storage.BucketHandle, c *clip) error
 	}
 	defer os.Remove(oname)
 
-	odur, err = getClipDuration(oname)
+	odur, err := getClipDuration(oname)
 	if err != nil {
 		return err
 	}
@@ -205,25 +225,30 @@ func transcode(ctx context.Context, bucket *storage.BucketHandle, c *clip) error
 		return fmt.Errorf("durations inconsistent, in=%v, out=%v", idur, odur)
 	}
 
-	dest := bucket.Object(c.mp4.Name)
-	w := dest.NewWriter(ctx)
-	w.ObjectAttrs.Metadata = c.mp4.Metadata
-	w.ObjectAttrs.ContentType = c.mp4.ContentType
+	grp.Go(func() error {
+		dest := bucket.Object(c.mp4.Name)
+		w := dest.NewWriter(ctx)
+		w.ObjectAttrs.Metadata = c.mp4.Metadata
+		w.ObjectAttrs.ContentType = c.mp4.ContentType
+		w.ObjectAttrs.Metadata["duration"] = odur.String()
 
-	f, err := os.Open(oname)
-	if err != nil {
-		return err
-	}
-	defer f.Close()
-	n, err := io.Copy(w, f)
-	if err != nil {
-		return err
-	}
+		f, err := os.Open(oname)
+		if err != nil {
+			return err
+		}
+		defer f.Close()
+		n, err := io.Copy(w, f)
+		if err != nil {
+			return err
+		}
 
-	log.Printf("Downloaded, transcoded, and uploaded %v bytes in %v",
-		humanize.Bytes(uint64(n)), time.Since(start))
+		log.Printf("Downloaded, transcoded, and uploaded %v bytes in %v",
+			humanize.Bytes(uint64(n)), time.Since(start))
 
-	return w.Close()
+		return w.Close()
+	})
+
+	return grp.Wait()
 }
 
 func filter(ctx context.Context, bucket *storage.BucketHandle, clips []*clip) chan *clip {
