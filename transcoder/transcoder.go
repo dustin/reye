@@ -155,7 +155,19 @@ func getOrigDuration(ctx context.Context, bucket *storage.BucketHandle, c *clip)
 	}
 	defer tmpf.Close()
 	defer os.Remove(oname)
-	return getClipDuration(oname)
+	dur, err := getClipDuration(oname)
+	if err != nil {
+		return 0, err
+	}
+
+	newattrs := storage.ObjectAttrsToUpdate{
+		Metadata: attrs.Metadata,
+	}
+	newattrs.Metadata["duration"] = dur.String()
+	if _, err = obj.Update(ctx, newattrs); err != nil {
+		log.Printf("Error updating mp4 duration: %v", err)
+	}
+	return dur, nil
 }
 
 func transcode(ctx context.Context, bucket *storage.BucketHandle, c *clip) error {
