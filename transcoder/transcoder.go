@@ -134,12 +134,8 @@ func getOrigDuration(ctx context.Context, bucket *storage.BucketHandle, c *clip)
 		return 0, fmt.Errorf("no mp4 found")
 	}
 	obj := bucket.Object(c.mp4.Name)
-	attrs, err := obj.Attrs(ctx)
-	if err != nil {
-		return 0, err
-	}
-	if attrs.Metadata["duration"] != "" {
-		return time.ParseDuration(attrs.Metadata["duration"])
+	if c.mp4.Metadata["duration"] != "" {
+		return time.ParseDuration(c.mp4.Metadata["duration"])
 	}
 
 	r, err := obj.NewReader(ctx)
@@ -161,7 +157,7 @@ func getOrigDuration(ctx context.Context, bucket *storage.BucketHandle, c *clip)
 	}
 
 	newattrs := storage.ObjectAttrsToUpdate{
-		Metadata: attrs.Metadata,
+		Metadata: c.mp4.Metadata,
 	}
 	newattrs.Metadata["duration"] = dur.String()
 	if _, err = obj.Update(ctx, newattrs); err != nil {
@@ -200,14 +196,10 @@ func transcode(ctx context.Context, bucket *storage.BucketHandle, c *clip) error
 		return err
 	}
 
-	attrs, err := obj.Attrs(ctx)
-	if err != nil {
-		return err
-	}
-	if attrs.Metadata["duration"] == "" {
+	if c.avi.Metadata["duration"] == "" {
 		grp.Go(func() error {
 			newattrs := storage.ObjectAttrsToUpdate{
-				Metadata: attrs.Metadata,
+				Metadata: c.avi.Metadata,
 			}
 			newattrs.Metadata["duration"] = idur.String()
 			_, err := obj.Update(ctx, newattrs)
