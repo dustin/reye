@@ -27,6 +27,7 @@ var (
 	authFile   = flag.String("authfile", "", "Path to auth json file")
 	bucketName = flag.String("bucket", "", "Bucket name")
 	minRatio   = flag.Int("minRatio", 40, "Minimum percentage considered valid")
+	onlyBroken = flag.Bool("onlybroken", false, "Only update obviously broken outputs")
 	ffmpeg     = flag.String("ffmpeg", "ffmpeg", "path to ffmpeg")
 	ffprobe    = flag.String("ffprobe", "ffprobe", "path to ffprobe")
 
@@ -80,7 +81,11 @@ func findAll(ctx context.Context, bucket *storage.BucketHandle) ([]*clip, error)
 	rv := make([]*clip, 0, len(m))
 	for _, v := range m {
 		if v.avi != nil && v.mp4 != nil {
-			if int(100*v.ratio()) < *minRatio {
+			if *onlyBroken {
+				if _, err := getOrigDuration(ctx, bucket, v); err != nil {
+					rv = append(rv, v)
+				}
+			} else if int(100*v.ratio()) < *minRatio {
 				rv = append(rv, v)
 			}
 		}
