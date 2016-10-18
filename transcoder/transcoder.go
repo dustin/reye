@@ -21,15 +21,17 @@ import (
 	"net/url"
 
 	"golang.org/x/net/context"
+	"golang.org/x/sync/errgroup"
 )
 
 var (
-	authFile   = flag.String("authfile", "", "Path to auth json file")
-	bucketName = flag.String("bucket", "", "Bucket name")
-	minRatio   = flag.Int("minRatio", 40, "Minimum percentage considered valid")
-	onlyBroken = flag.Bool("onlybroken", false, "Only update obviously broken outputs")
-	ffmpeg     = flag.String("ffmpeg", "ffmpeg", "path to ffmpeg")
-	ffprobe    = flag.String("ffprobe", "ffprobe", "path to ffprobe")
+	authFile          = flag.String("authfile", "", "Path to auth json file")
+	bucketName        = flag.String("bucket", "", "Bucket name")
+	minRatio          = flag.Int("minRatio", 40, "Minimum percentage considered valid")
+	onlyBroken        = flag.Bool("onlybroken", false, "Only update obviously broken outputs")
+	filterConcurrency = flag.Int("filter_concurrency", 8, "How many filters to run concurrently")
+	ffmpeg            = flag.String("ffmpeg", "ffmpeg", "path to ffmpeg")
+	ffprobe           = flag.String("ffprobe", "ffprobe", "path to ffprobe")
 
 	basePath string
 )
@@ -80,15 +82,7 @@ func findAll(ctx context.Context, bucket *storage.BucketHandle) ([]*clip, error)
 
 	rv := make([]*clip, 0, len(m))
 	for _, v := range m {
-		if v.avi != nil && v.mp4 != nil {
-			if *onlyBroken {
-				if _, err := getOrigDuration(ctx, bucket, v); err != nil {
-					rv = append(rv, v)
-				}
-			} else if int(100*v.ratio()) < *minRatio {
-				rv = append(rv, v)
-			}
-		}
+		rv = append(rv, v)
 	}
 
 	return rv, nil
@@ -227,6 +221,32 @@ func transcode(ctx context.Context, bucket *storage.BucketHandle, c *clip) error
 	return w.Close()
 }
 
+func filter(ctx context.Context, bucket *storage.BucketHandle, clips []*clip) chan *clip {
+	grp, _ := errgroup.WithContext(ctx)
+
+	ch := make(chan *clip)
+	sem := make(chan bool, *filterConcurrency)
+	go func() {
+		defer close(ch)
+		for _, c := range clips {
+			if *onlyBroken {
+				grp.Go(func() error {
+					sem <- true
+					defer func() { <-sem }()
+					if _, err := getOrigDuration(ctx, bucket, c); err != nil {
+						ch <- c
+					}
+					return nil
+				})
+			} else if int(100*c.ratio()) < *minRatio {
+				ch <- c
+			}
+		}
+		grp.Wait()
+	}()
+	return ch
+}
+
 func main() {
 	flag.Parse()
 
@@ -240,10 +260,12 @@ func main() {
 		log.Fatalf("Couldn't list stuff: %v", err)
 	}
 
-	log.Printf("Transcoding %v clips", len(clips))
-	for _, c := range clips {
+	i := 0
+	for c := range filter(ctx, bucket, clips) {
 		if err := transcode(ctx, bucket, c); err != nil {
 			log.Fatalf("Error transcoding %v: %v", c, err)
 		}
+		i++
 	}
+	log.Printf("Updated %v clips", i)
 }
