@@ -97,7 +97,7 @@ func handleBatchScan(w http.ResponseWriter, r *http.Request) {
 		if err != nil {
 			log.Errorf(c, "Error iterating bucket: %v", err)
 		}
-		if ob.ContentType == "image/jpeg" {
+		if ob.ContentType == "video/mp4" {
 			// basement/20161013173815.jpg
 			if err := grp.Wait(); err != nil {
 				log.Errorf(c, "failed to get default GCS bucket name: %v", err)
@@ -119,6 +119,13 @@ func handleBatchScan(w http.ResponseWriter, r *http.Request) {
 					continue
 				}
 			}
+
+			dur, err := time.ParseDuration(ob.Metadata["duration"])
+			if err != nil {
+				log.Warningf(c, "No duration for %v: %v", fp[0], err)
+				continue
+			}
+
 			evkey := datastore.NewKey(c, "Event", pp[0]+"/"+fp[0], 0, nil)
 
 			if !evkeys[evkey.StringID()] {
@@ -129,6 +136,7 @@ func handleBatchScan(w http.ResponseWriter, r *http.Request) {
 					Camera:    camkey,
 					Timestamp: t,
 					Filename:  fp[0],
+					Duration:  dur,
 				})
 				todo++
 			}
