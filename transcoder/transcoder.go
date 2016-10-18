@@ -4,14 +4,17 @@ import (
 	"flag"
 	"fmt"
 	"io"
-	"io/ioutil"
 	"log"
+	"os"
+	"time"
 
 	"github.com/dustin/go-humanize"
 
 	"cloud.google.com/go/storage"
 	"google.golang.org/api/iterator"
 	"google.golang.org/api/option"
+
+	"os/exec"
 
 	"golang.org/x/net/context"
 )
@@ -20,6 +23,7 @@ var (
 	authFile   = flag.String("authfile", "", "Path to auth json file")
 	bucketName = flag.String("bucket", "", "Bucket name")
 	minRatio   = flag.Int("minRatio", 40, "Minimum percentage considered valid")
+	ffmpeg     = flag.String("ffmpeg", "ffmpeg", "path to ffmpeg")
 
 	basePath string
 )
@@ -61,6 +65,8 @@ func findAll(ctx context.Context, bucket *storage.BucketHandle) ([]*clip, error)
 			e.mp4 = ob
 		case "video/avi":
 			e.avi = ob
+		case "image/jpeg":
+			// don't care
 		default:
 			log.Printf("   Unknown %v (%v)", ob.Name, ob.ContentType)
 		}
@@ -69,7 +75,9 @@ func findAll(ctx context.Context, bucket *storage.BucketHandle) ([]*clip, error)
 	rv := make([]*clip, 0, len(m))
 	for _, v := range m {
 		if v.avi != nil && v.mp4 != nil {
-			rv = append(rv, v)
+			if int(100*v.ratio()) < *minRatio {
+				rv = append(rv, v)
+			}
 		}
 	}
 
@@ -85,15 +93,45 @@ func initStorageClient(ctx context.Context) *storage.Client {
 }
 
 func transcode(ctx context.Context, bucket *storage.BucketHandle, c *clip) error {
+	log.Printf("Transcoding %v", c)
+	start := time.Now()
 	obj := bucket.Object(c.avi.Name)
 	r, err := obj.NewReader(ctx)
 	if err != nil {
 		return err
 	}
 	defer r.Close()
-	n, err := io.Copy(ioutil.Discard, r)
-	log.Printf("Read %v from %v", humanize.Bytes(uint64(n)), c.avi.Name)
-	return err
+
+	tmpname := "tmp.mp4"
+
+	cmd := exec.Command(*ffmpeg, "-i", "-", tmpname)
+	cmd.Stdin = r
+	cmd.Stderr = os.Stderr
+	cmd.Stdout = os.Stdout
+	if err := cmd.Run(); err != nil {
+		return err
+	}
+	defer os.Remove(tmpname)
+
+	dest := bucket.Object(c.mp4.Name)
+	w := dest.NewWriter(ctx)
+	w.ObjectAttrs.Metadata = c.mp4.Metadata
+	w.ObjectAttrs.ContentType = c.mp4.ContentType
+
+	f, err := os.Open(tmpname)
+	if err != nil {
+		return err
+	}
+	defer f.Close()
+	n, err := io.Copy(w, f)
+	if err != nil {
+		return err
+	}
+
+	log.Printf("Downloaded, transcoded, and uploaded %v bytes in %v",
+		humanize.Bytes(uint64(n)), time.Since(start))
+
+	return w.Close()
 }
 
 func main() {
@@ -109,11 +147,10 @@ func main() {
 		log.Fatalf("Couldn't list stuff: %v", err)
 	}
 
+	log.Printf("Transcoding %v clips", len(clips))
 	for _, c := range clips {
-		if int(100*c.ratio()) < *minRatio {
-			if err := transcode(ctx, bucket, c); err != nil {
-				log.Fatalf("Error transcoding %v: %v", c, err)
-			}
+		if err := transcode(ctx, bucket, c); err != nil {
+			log.Fatalf("Error transcoding %v: %v", c, err)
 		}
 	}
 }
