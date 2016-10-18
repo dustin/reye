@@ -3,6 +3,8 @@ package main
 import (
 	"flag"
 	"fmt"
+	"io"
+	"io/ioutil"
 	"log"
 
 	"github.com/dustin/go-humanize"
@@ -37,9 +39,7 @@ func (c clip) String() string {
 		100*c.ratio())
 }
 
-func findAll(ctx context.Context, sto *storage.Client) ([]*clip, error) {
-	bucket := sto.Bucket(*bucketName)
-
+func findAll(ctx context.Context, bucket *storage.BucketHandle) ([]*clip, error) {
 	m := map[string]*clip{}
 	it := bucket.Objects(ctx, nil)
 	for {
@@ -84,21 +84,36 @@ func initStorageClient(ctx context.Context) *storage.Client {
 	return client
 }
 
+func transcode(ctx context.Context, bucket *storage.BucketHandle, c *clip) error {
+	obj := bucket.Object(c.avi.Name)
+	r, err := obj.NewReader(ctx)
+	if err != nil {
+		return err
+	}
+	defer r.Close()
+	n, err := io.Copy(ioutil.Discard, r)
+	log.Printf("Read %v from %v", humanize.Bytes(uint64(n)), c.avi.Name)
+	return err
+}
+
 func main() {
 	flag.Parse()
 
 	ctx := context.Background()
 
 	sto := initStorageClient(ctx)
+	bucket := sto.Bucket(*bucketName)
 
-	clips, err := findAll(ctx, sto)
+	clips, err := findAll(ctx, bucket)
 	if err != nil {
 		log.Fatalf("Couldn't list stuff: %v", err)
 	}
 
 	for _, c := range clips {
 		if int(100*c.ratio()) < *minRatio {
-			log.Printf("Need to redo: %v", c)
+			if err := transcode(ctx, bucket, c); err != nil {
+				log.Fatalf("Error transcoding %v: %v", c, err)
+			}
 		}
 	}
 }
