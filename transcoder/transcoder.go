@@ -82,7 +82,9 @@ func findAll(ctx context.Context, bucket *storage.BucketHandle) ([]*clip, error)
 
 	rv := make([]*clip, 0, len(m))
 	for _, v := range m {
-		rv = append(rv, v)
+		if v.avi != nil {
+			rv = append(rv, v)
+		}
 	}
 
 	return rv, nil
