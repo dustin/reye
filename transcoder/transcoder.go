@@ -259,6 +259,7 @@ func filter(ctx context.Context, bucket *storage.BucketHandle, clips []*clip) ch
 	go func() {
 		defer close(ch)
 		for _, c := range clips {
+			c := c
 			if *onlyBroken {
 				grp.Go(func() error {
 					sem <- true
