@@ -98,11 +98,11 @@ func initStorageClient(ctx context.Context) *storage.Client {
 }
 
 func getClipDuration(fn string) (time.Duration, error) {
-	printfmt := "-out_format"
+	printfmt := "-print_format"
 	if strings.HasSuffix(*ffprobe, "avprobe") {
 		printfmt = "-of"
 	}
-	cmd := exec.Command(*ffprobe, "-v", "quiet", printfmt, "json", "-show_format", fn)
+	cmd := exec.Command(*ffprobe, "-v", "error", printfmt, "json", "-show_format", fn)
 	cmd.Stderr = os.Stderr
 	o, err := cmd.Output()
 	if err != nil {
@@ -126,6 +126,23 @@ func abs(d time.Duration) time.Duration {
 		return -d
 	}
 	return d
+}
+
+func getOrigDuration(ctx context.Context, bucket *storage.BucketHandle, c *clip) (time.Duration, error) {
+	oname := url.QueryEscape(c.mp4.Name)
+	tmpf, err := os.Create(oname)
+	if err != nil {
+		return 0, err
+	}
+	defer tmpf.Close()
+	defer os.Remove(oname)
+	obj := bucket.Object(c.mp4.Name)
+	r, err := obj.NewReader(ctx)
+	if err != nil {
+		return 0, err
+	}
+	defer r.Close()
+	return getClipDuration(oname)
 }
 
 func transcode(ctx context.Context, bucket *storage.BucketHandle, c *clip) error {
@@ -156,6 +173,17 @@ func transcode(ctx context.Context, bucket *storage.BucketHandle, c *clip) error
 		return err
 	}
 
+	odur, err := getOrigDuration(ctx, bucket, c)
+	if err != nil {
+		log.Printf("Error getting original clip duration: %v", err)
+		odur = 0
+	}
+
+	if abs(odur-idur) < time.Second {
+		log.Printf("Skipping %v, since it's roughly the same size (%v vs. %v)",
+			c, idur, odur)
+	}
+
 	cmd := exec.Command(*ffmpeg, "-i", iname, oname)
 	cmd.Stderr = os.Stderr
 	cmd.Stdout = os.Stdout
@@ -164,7 +192,7 @@ func transcode(ctx context.Context, bucket *storage.BucketHandle, c *clip) error
 	}
 	defer os.Remove(oname)
 
-	odur, err := getClipDuration(oname)
+	odur, err = getClipDuration(oname)
 	if err != nil {
 		return err
 	}
