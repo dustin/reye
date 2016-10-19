@@ -127,7 +127,11 @@ func handleBatchScan(w http.ResponseWriter, r *http.Request) {
 			}
 			var md []struct{ K, V string }
 			for k, v := range ob.Metadata {
-				md = append(md, struct{ K, V string }{k, v})
+				switch k {
+				case "", "camera", "captured", "duration":
+				default:
+					md = append(md, struct{ K, V string }{k, v})
+				}
 			}
 
 			evkey := datastore.NewKey(c, "Event", pp[0]+"/"+fp[0], 0, nil)

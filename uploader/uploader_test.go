@@ -12,6 +12,7 @@ func TestDetailParsing(t *testing.T) {
 		exp map[string]string
 	}{
 		{"", map[string]string{}},
+		{"\n", map[string]string{}},
 		{"test=true", map[string]string{"test": "true"}},
 		{"test=true nottest=false", map[string]string{
 			"test":    "true",
