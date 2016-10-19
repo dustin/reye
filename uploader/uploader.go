@@ -8,10 +8,12 @@ import (
 	"os"
 	"strconv"
 	"strings"
+	"text/scanner"
 	"time"
 	"unicode"
 
 	"github.com/dustin/go-humanize"
+	"github.com/dustin/reye/vidtool"
 
 	"cloud.google.com/go/storage"
 	"google.golang.org/api/option"
@@ -36,16 +38,14 @@ var (
 )
 
 type clip struct {
-	thumb, vid, ovid os.FileInfo
-	ts               time.Time
+	thumb, ovid os.FileInfo
+	details     map[string]string
+	ts          time.Time
 }
 
 func (c clip) String() string {
-	size := c.vid.Size() + c.thumb.Size()
-	if c.ovid != nil {
-		size += c.ovid.Size()
-	}
-	return fmt.Sprintf("vid: %v, thumb: %v @ ts=%v (%v)", c.vid.Name(), c.thumb.Name(),
+	size := c.ovid.Size() + c.thumb.Size()
+	return fmt.Sprintf("vid: %v, thumb: %v @ ts=%v (%v)", c.ovid.Name(), c.thumb.Name(),
 		c.ts.Format(time.RFC3339), humanize.Bytes(uint64(size)))
 }
 
@@ -64,6 +64,10 @@ func parseClipInfo(name string) (int, time.Time) {
 	return id, ts
 }
 
+func fq(fn string) string {
+	return path.Join(basePath, fn)
+}
+
 func upload(ctx context.Context, sto *storage.Client, c clip) error {
 	grp, _ := errgroup.WithContext(ctx)
 
@@ -73,7 +77,8 @@ func upload(ctx context.Context, sto *storage.Client, c clip) error {
 		defer func(t time.Time) {
 			log.Printf("Finished uploading %v in %v", fn, time.Since(t))
 		}(time.Now())
-		f, err := os.Open(path.Join(basePath, fn))
+
+		f, err := os.Open(fq(fn))
 		if err != nil {
 			return err
 		}
@@ -87,16 +92,26 @@ func upload(ctx context.Context, sto *storage.Client, c clip) error {
 		return w.Close()
 	}
 
-	vob := bucket.Object(path.Join(*camid, c.ts.Format(clipTimeFmt)+".mp4"))
-	vattrs := storage.ObjectAttrs{
-		ContentType: "video/mp4",
-		Metadata: map[string]string{
-			"captured": c.ts.Format(time.RFC3339),
-			"camera":   *camid,
-		},
-	}
+	grp.Go(func() error {
+		oname := c.ts.Format(clipTimeFmt) + ".mp4"
+		odur, err := vidtool.Transcode(fq(c.ovid.Name()), oname)
+		if err != nil {
+			return err
+		}
+		defer os.Remove(oname)
 
-	grp.Go(func() error { return up(c.vid.Name(), vob, vattrs) })
+		vob := bucket.Object(path.Join(*camid, oname))
+		vattrs := storage.ObjectAttrs{
+			ContentType: "video/mp4",
+			Metadata: map[string]string{
+				"captured": c.ts.Format(time.RFC3339),
+				"camera":   *camid,
+				"duration": odur.String(),
+			},
+		}
+		return up(oname, vob, vattrs)
+
+	})
 
 	tob := bucket.Object(path.Join(*camid, c.ts.Format(clipTimeFmt)+".jpg"))
 	tattrs := storage.ObjectAttrs{
@@ -108,17 +123,20 @@ func upload(ctx context.Context, sto *storage.Client, c clip) error {
 	}
 	grp.Go(func() error { return up(c.thumb.Name(), tob, tattrs) })
 
-	if c.ovid != nil {
-		ovob := bucket.Object(path.Join(*camid, c.ts.Format(clipTimeFmt)+".avi"))
-		ovattrs := storage.ObjectAttrs{
-			ContentType: "video/avi",
-			Metadata: map[string]string{
-				"captured": c.ts.Format(time.RFC3339),
-				"camera":   *camid,
-			},
-		}
-		grp.Go(func() error { return up(c.ovid.Name(), ovob, ovattrs) })
+	dur, err := vidtool.ClipDuration(fq(c.ovid.Name()))
+	if err != nil {
+		return err
 	}
+	ovob := bucket.Object(path.Join(*camid, c.ts.Format(clipTimeFmt)+".avi"))
+	ovattrs := storage.ObjectAttrs{
+		ContentType: "video/avi",
+		Metadata: map[string]string{
+			"captured": c.ts.Format(time.RFC3339),
+			"camera":   *camid,
+			"duration": dur.String(),
+		},
+	}
+	grp.Go(func() error { return up(c.ovid.Name(), ovob, ovattrs) })
 
 	return grp.Wait()
 }
@@ -140,17 +158,43 @@ func cleanup(c clip) error {
 		return err
 	}
 
-	if err := os.Remove(path.Join(basePath, c.vid.Name())); err != nil {
+	if err := os.Remove(path.Join(basePath, c.ovid.Name())); err != nil {
 		return err
 	}
 
-	if c.ovid != nil {
-		if err := os.Remove(path.Join(basePath, c.ovid.Name())); err != nil {
-			return err
+	return nil
+}
+
+func parseDetails(fn string) (int, map[string]string) {
+	parts := strings.FieldsFunc(fn, func(r rune) bool {
+		return !unicode.IsNumber(r)
+	})
+	id, err := strconv.Atoi(parts[0])
+	if err != nil {
+		log.Fatalf("error parsing clip info from %v (%v): %v", fn, parts, err)
+	}
+
+	f, err := os.Open(fn)
+	if err != nil {
+		log.Printf("Error opening details file %v: %v", fn, err)
+		return id, nil
+	}
+	defer f.Close()
+
+	rv := map[string]string{}
+
+	s := scanner.Scanner{}
+	s.Init(f)
+	var tok rune
+	for tok != scanner.EOF {
+		tok = s.Scan()
+		a := strings.SplitN(s.TokenText(), "=", 2)
+		if len(a) == 2 {
+			rv[a[0]] = rv[a[1]]
 		}
 	}
 
-	return nil
+	return id, rv
 }
 
 func uploadAll(ctx context.Context, sto *storage.Client) {
@@ -169,14 +213,18 @@ func uploadAll(ctx context.Context, sto *storage.Client) {
 		dname := dent.Name()
 		if dname[0] == '.' {
 			// ignore dot files
-		} else if strings.HasSuffix(dname, ".mp4") || strings.HasSuffix(dname, ".avi") {
+		} else if strings.HasSuffix(dname, ".details") {
+			id, details := parseDetails(dname)
+			if details != nil {
+				c := clips[id]
+				c.details = details
+				clips[id] = c
+				log.Printf("Parsed details from %v: %v", dname, c.details)
+			}
+		} else if strings.HasSuffix(dname, ".avi") {
 			id, ts := parseClipInfo(dname)
 			c := clips[id]
-			if strings.HasSuffix(dname, ".mp4") {
-				c.vid = dent
-			} else {
-				c.ovid = dent
-			}
+			c.ovid = dent
 			c.ts = ts
 			clips[id] = c
 		} else if strings.HasSuffix(dname, ".jpg") {
@@ -188,17 +236,8 @@ func uploadAll(ctx context.Context, sto *storage.Client) {
 	}
 
 	for id, clip := range clips {
-		if clip.thumb != nil && clip.vid != nil {
+		if clip.thumb != nil && clip.ovid != nil && clip.details != nil {
 
-			if clip.ovid != nil {
-				relsize := float64(clip.vid.Size()) / float64(clip.ovid.Size()) * 100
-				if relsize < 60 {
-					log.Printf("Warning: %v is %v and %v is %v -- too small (%.1f%%)",
-						clip.vid.Name(), humanize.Bytes(uint64(clip.vid.Size())),
-						clip.ovid.Name(), humanize.Bytes(uint64(clip.ovid.Size())),
-						relsize)
-				}
-			}
 			log.Printf("%v -> %v", id, clip)
 			if err := upload(ctx, sto, clip); err != nil {
 				log.Fatalf("Error uploading: %v", err)

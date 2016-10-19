@@ -1,27 +1,23 @@
 package main
 
 import (
-	"encoding/json"
 	"flag"
 	"fmt"
 	"io"
 	"log"
 	"os"
-	"strings"
 	"time"
-
-	"github.com/dustin/go-humanize"
-
-	"cloud.google.com/go/storage"
-	"google.golang.org/api/iterator"
-	"google.golang.org/api/option"
-
-	"os/exec"
 
 	"net/url"
 
+	"github.com/dustin/go-humanize"
+	"github.com/dustin/reye/vidtool"
+
+	"cloud.google.com/go/storage"
 	"golang.org/x/net/context"
 	"golang.org/x/sync/errgroup"
+	"google.golang.org/api/iterator"
+	"google.golang.org/api/option"
 )
 
 var (
@@ -30,8 +26,6 @@ var (
 	minRatio          = flag.Int("minRatio", 40, "Minimum percentage considered valid")
 	onlyBroken        = flag.Bool("onlybroken", false, "Only update obviously broken outputs")
 	filterConcurrency = flag.Int("filter_concurrency", 8, "How many filters to run concurrently")
-	ffmpeg            = flag.String("ffmpeg", "ffmpeg", "path to ffmpeg")
-	ffprobe           = flag.String("ffprobe", "ffprobe", "path to ffprobe")
 
 	basePath string
 )
@@ -98,30 +92,6 @@ func initStorageClient(ctx context.Context) *storage.Client {
 	return client
 }
 
-func getClipDuration(fn string) (time.Duration, error) {
-	printfmt := "-print_format"
-	if strings.HasSuffix(*ffprobe, "avprobe") {
-		printfmt = "-of"
-	}
-	cmd := exec.Command(*ffprobe, "-v", "error", printfmt, "json", "-show_format", fn)
-	cmd.Stderr = os.Stderr
-	o, err := cmd.Output()
-	if err != nil {
-		return 0, err
-	}
-	info := struct {
-		Format struct {
-			Duration string
-		}
-	}{}
-
-	if err := json.Unmarshal(o, &info); err != nil {
-		return 0, err
-	}
-
-	return time.ParseDuration(info.Format.Duration + "s")
-}
-
 func abs(d time.Duration) time.Duration {
 	if d < 0 {
 		return -d
@@ -151,7 +121,7 @@ func getOrigDuration(ctx context.Context, bucket *storage.BucketHandle, c *clip)
 	}
 	defer tmpf.Close()
 	defer os.Remove(oname)
-	dur, err := getClipDuration(oname)
+	dur, err := vidtool.ClipDuration(oname)
 	if err != nil {
 		return 0, err
 	}
@@ -191,7 +161,7 @@ func transcode(ctx context.Context, bucket *storage.BucketHandle, c *clip) error
 		return err
 	}
 
-	idur, err := getClipDuration(iname)
+	idur, err := vidtool.ClipDuration(iname)
 	if err != nil {
 		return err
 	}
@@ -221,21 +191,10 @@ func transcode(ctx context.Context, bucket *storage.BucketHandle, c *clip) error
 		}
 	}
 
-	cmd := exec.Command(*ffmpeg, "-v", "warning", "-i", iname, oname)
-	cmd.Stderr = os.Stderr
-	cmd.Stdout = os.Stdout
-	if err := cmd.Run(); err != nil {
-		return err
-	}
+	odur, err := vidtool.Transcode(iname, oname)
 	defer os.Remove(oname)
-
-	odur, err := getClipDuration(oname)
 	if err != nil {
 		return err
-	}
-
-	if abs(odur-idur) > time.Second {
-		return fmt.Errorf("durations inconsistent, in=%v, out=%v", idur, odur)
 	}
 
 	grp.Go(func() error {
