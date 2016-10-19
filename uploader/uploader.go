@@ -1,6 +1,7 @@
 package main
 
 import (
+	"bufio"
 	"flag"
 	"fmt"
 	"log"
@@ -8,7 +9,6 @@ import (
 	"os"
 	"strconv"
 	"strings"
-	"text/scanner"
 	"time"
 	"unicode"
 
@@ -175,6 +175,26 @@ func cleanup(c clip) error {
 	return nil
 }
 
+func parseMap(r io.Reader) map[string]string {
+	rv := map[string]string{}
+
+	s := bufio.NewScanner(r)
+	s.Split(bufio.ScanWords)
+
+	for s.Scan() {
+		a := strings.SplitN(s.Text(), "=", 2)
+		if len(a) == 2 {
+			rv[a[0]] = a[1]
+		}
+
+	}
+	if err := s.Err(); err != nil {
+		log.Printf("scanning details: %v", err)
+	}
+
+	return rv
+}
+
 func parseDetails(fn string) (int, map[string]string) {
 	parts := strings.FieldsFunc(fn, func(r rune) bool {
 		return !unicode.IsNumber(r)
@@ -191,20 +211,7 @@ func parseDetails(fn string) (int, map[string]string) {
 	}
 	defer f.Close()
 
-	rv := map[string]string{}
-
-	s := scanner.Scanner{}
-	s.Init(f)
-	var tok rune
-	for tok != scanner.EOF {
-		tok = s.Scan()
-		a := strings.SplitN(s.TokenText(), "=", 2)
-		if len(a) == 2 {
-			rv[a[0]] = rv[a[1]]
-		}
-	}
-
-	return id, rv
+	return id, parseMap(f)
 }
 
 func uploadAll(ctx context.Context, sto *storage.Client) {
