@@ -22,10 +22,11 @@ func (u *Camera) setKey(to *datastore.Key) {
 }
 
 type Event struct {
-	Camera    *datastore.Key `json:"cam_id" datastore:"camera"`
-	Timestamp time.Time      `json:"ts" datastore:"ts"`
-	Filename  string         `json:"fn" datastore:"fn"`
-	Duration  time.Duration  `json:"duration" datastore"duration"`
+	Camera    *datastore.Key          `json:"cam_id" datastore:"camera"`
+	Timestamp time.Time               `json:"ts" datastore:"ts"`
+	Filename  string                  `json:"fn" datastore:"fn"`
+	Duration  time.Duration           `json:"duration" datastore"duration"`
+	Metadata  []struct{ K, V string } `json:"metadata", datastore:"metadata"`
 
 	Key *datastore.Key `datastore:"-"`
 }

@@ -125,6 +125,10 @@ func handleBatchScan(w http.ResponseWriter, r *http.Request) {
 				log.Warningf(c, "No duration for %v: %v", fp[0], err)
 				continue
 			}
+			var md []struct{ K, V string }
+			for k, v := range ob.Metadata {
+				md = append(md, struct{ K, V string }{k, v})
+			}
 
 			evkey := datastore.NewKey(c, "Event", pp[0]+"/"+fp[0], 0, nil)
 
@@ -137,6 +141,7 @@ func handleBatchScan(w http.ResponseWriter, r *http.Request) {
 					Timestamp: t,
 					Filename:  fp[0],
 					Duration:  dur,
+					Metadata:  md,
 				})
 				todo++
 			}

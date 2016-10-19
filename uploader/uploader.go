@@ -248,7 +248,6 @@ func uploadAll(ctx context.Context, sto *storage.Client) {
 
 	for id, clip := range clips {
 		if clip.thumb != nil && clip.ovid != nil && clip.details != nil {
-
 			log.Printf("%v -> %v", id, clip)
 			if err := upload(ctx, sto, clip); err != nil {
 				log.Fatalf("Error uploading: %v", err)
