@@ -174,7 +174,7 @@ func parseDetails(fn string) (int, map[string]string) {
 		log.Fatalf("error parsing clip info from %v (%v): %v", fn, parts, err)
 	}
 
-	f, err := os.Open(fn)
+	f, err := os.Open(fq(fn))
 	if err != nil {
 		log.Printf("Error opening details file %v: %v", fn, err)
 		return id, nil
