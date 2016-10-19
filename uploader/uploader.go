@@ -100,11 +100,11 @@ func upload(ctx context.Context, sto *storage.Client, c clip) error {
 
 	grp.Go(func() error {
 		oname := c.ts.Format(clipTimeFmt) + ".mp4"
-		odur, err := vidtool.Transcode(fq(c.ovid.Name()), oname)
+		odur, err := vidtool.Transcode(fq(c.ovid.Name()), fq(oname))
 		if err != nil {
 			return err
 		}
-		defer os.Remove(oname)
+		defer os.Remove(fq(oname))
 
 		vob := bucket.Object(path.Join(*camid, oname))
 		vattrs := storage.ObjectAttrs{
