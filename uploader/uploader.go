@@ -49,19 +49,19 @@ func (c clip) String() string {
 		c.ts.Format(time.RFC3339), humanize.Bytes(uint64(size)))
 }
 
-func parseClipInfo(name string) (int, time.Time) {
+func parseClipInfo(name string) (int, time.Time, error) {
 	parts := strings.FieldsFunc(name, func(r rune) bool {
 		return !unicode.IsNumber(r)
 	})
 	id, err := strconv.Atoi(parts[0])
 	if err != nil {
-		log.Fatalf("error parsing clip info from %v (%v): %v", name, parts, err)
+		return 0, time.Time{}, fmt.Errorf("parsing clip info from  %v (%v): %v", name, parts, err)
 	}
 	ts, err := time.ParseInLocation(clipTimeFmt, parts[1], time.Local)
 	if err != nil {
-		log.Fatalf("error parsing timestamp from %v (%v): %v", name, parts, err)
+		return 0, time.Time{}, fmt.Errorf("parsing timestamp from %v (%v): %v", name, parts, err)
 	}
-	return id, ts
+	return id, ts, nil
 }
 
 func fq(fn string) string {
@@ -195,33 +195,32 @@ func parseMap(r io.Reader) map[string]string {
 	return rv
 }
 
-func parseDetails(fn string) (int, map[string]string) {
+func parseDetails(fn string) (int, map[string]string, error) {
 	parts := strings.FieldsFunc(fn, func(r rune) bool {
 		return !unicode.IsNumber(r)
 	})
 	id, err := strconv.Atoi(parts[0])
 	if err != nil {
-		log.Fatalf("error parsing clip info from %v (%v): %v", fn, parts, err)
+		return 0, nil, fmt.Errorf("parsing clip info from %v (%v): %v", fn, parts, err)
 	}
 
 	f, err := os.Open(fq(fn))
 	if err != nil {
-		log.Printf("Error opening details file %v: %v", fn, err)
-		return id, nil
+		return id, nil, err
 	}
 	defer f.Close()
 
-	return id, parseMap(f)
+	return id, parseMap(f), nil
 }
 
-func uploadAll(ctx context.Context, sto *storage.Client) {
+func uploadAll(ctx context.Context, sto *storage.Client) error {
 	d, err := os.Open(basePath)
 	if err != nil {
-		log.Fatalf("Can't open %v: %v", basePath, err)
+		return err
 	}
 	dents, err := d.Readdir(-1)
 	if err != nil {
-		log.Fatalf("Error in readdir: %v", err)
+		return err
 	}
 
 	clips := map[int]clip{}
@@ -231,22 +230,31 @@ func uploadAll(ctx context.Context, sto *storage.Client) {
 		if dname[0] == '.' {
 			// ignore dot files
 		} else if strings.HasSuffix(dname, ".details") {
-			id, details := parseDetails(dname)
-			if details != nil {
-				c := clips[id]
-				c.df = dent
-				c.details = details
-				clips[id] = c
-				log.Printf("Parsed details from %v: %v", dname, c.details)
+			id, details, err := parseDetails(dname)
+			if err != nil {
+				log.Printf("error parsing %v: %v", dname, err)
+				continue
 			}
+			c := clips[id]
+			c.df = dent
+			c.details = details
+			clips[id] = c
+			log.Printf("Parsed details from %v: %v", dname, c.details)
 		} else if strings.HasSuffix(dname, ".avi") {
-			id, ts := parseClipInfo(dname)
+			id, ts, err := parseClipInfo(dname)
+			if err != nil {
+				log.Printf("error parsing %v: %v", dname, err)
+				continue
+			}
 			c := clips[id]
 			c.ovid = dent
 			c.ts = ts
 			clips[id] = c
 		} else if strings.HasSuffix(dname, ".jpg") {
-			id, _ := parseClipInfo(dname)
+			id, _, err := parseClipInfo(dname)
+			if err != nil {
+				log.Printf("error parsing %v: %v", dname, err)
+			}
 			c := clips[id]
 			c.thumb = dent
 			clips[id] = c
@@ -257,13 +265,14 @@ func uploadAll(ctx context.Context, sto *storage.Client) {
 		if clip.thumb != nil && clip.ovid != nil && clip.details != nil {
 			log.Printf("%v -> %v", id, clip)
 			if err := upload(ctx, sto, clip); err != nil {
-				log.Fatalf("Error uploading: %v", err)
+				return fmt.Errorf("uploading %v: %v", clip, err)
 			}
 			if err := cleanup(clip); err != nil {
-				log.Fatalf("Error cleaning up: %v", err)
+				return fmt.Errorf("cleaning up %v: %v", clip, err)
 			}
 		}
 	}
+	return nil
 }
 
 func main() {
@@ -288,7 +297,9 @@ func main() {
 
 	if *interval > 0 {
 		for range time.Tick(*interval) {
-			uploadAll(ctx, sto)
+			if err := uploadAll(ctx, sto); err != nil {
+				log.Printf("Error uploading stuff: %v", err)
+			}
 		}
 	}
 
