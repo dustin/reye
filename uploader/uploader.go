@@ -84,7 +84,13 @@ func upload(ctx context.Context, sto *storage.Client, c clip) error {
 		}
 		w := ob.NewWriter(ctx)
 		w.ObjectAttrs.ContentType = attrs.ContentType
-		w.ObjectAttrs.Metadata = attrs.Metadata
+		w.ObjectAttrs.Metadata = map[string]string{}
+		for k, v := range c.details {
+			w.ObjectAttrs.Metadata[k] = v
+		}
+		for k, v := range attrs.Metadata {
+			w.ObjectAttrs.Metadata[k] = v
+		}
 		_, err = io.Copy(w, f)
 		if err != nil {
 			return err
