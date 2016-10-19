@@ -38,9 +38,9 @@ var (
 )
 
 type clip struct {
-	thumb, ovid os.FileInfo
-	details     map[string]string
-	ts          time.Time
+	thumb, ovid, df os.FileInfo
+	details         map[string]string
+	ts              time.Time
 }
 
 func (c clip) String() string {
@@ -160,11 +160,15 @@ func cleanup(c clip) error {
 		return nil
 	}
 
-	if err := os.Remove(path.Join(basePath, c.thumb.Name())); err != nil {
+	if err := os.Remove(fq(c.thumb.Name())); err != nil {
 		return err
 	}
 
-	if err := os.Remove(path.Join(basePath, c.ovid.Name())); err != nil {
+	if err := os.Remove(fq(c.ovid.Name())); err != nil {
+		return err
+	}
+
+	if err := os.Remove(fq(c.df.Name())); err != nil {
 		return err
 	}
 
@@ -223,6 +227,7 @@ func uploadAll(ctx context.Context, sto *storage.Client) {
 			id, details := parseDetails(dname)
 			if details != nil {
 				c := clips[id]
+				c.df = dent
 				c.details = details
 				clips[id] = c
 				log.Printf("Parsed details from %v: %v", dname, c.details)
