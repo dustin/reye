@@ -1,5 +1,5 @@
 <div ng-repeat="i in recent track by $index" class="event">
-  <span class="ts" title="{{i.ts}}">[{{i.duration|duration}}] {{i.ts|relDate}} ({{i.ts}})</span>
+  <span class="ts" title="{{i.ts}}">[{{i.duration|duration}}] {{i.ts|relDate}} ({{i.ts|calDate}})</span>
   <a href="{{base}}/{{i.fn}}.mp4">
     <img src="{{base}}/{{i.fn}}.jpg"></img>
   </a>

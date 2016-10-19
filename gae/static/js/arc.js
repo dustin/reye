@@ -17,7 +17,14 @@ eye = angular.module('eye', ['ngRoute']).
     }).
     filter('calDate', function() {
         return function(dstr) {
-            return moment(dstr).calendar();
+            return moment(dstr).calendar(null, {
+                sameDay: '[Today] HH:mm',
+                nextDay: '[Tomorrow]',
+                nextWeek: 'dddd',
+                lastDay: '[Yesterday] HH:mm',
+                lastWeek: '[Last] dddd HH:mm',
+                sameElse: 'YYYY/MM/DD HH:mm'
+            });
         };
     }).
     config(['$routeProvider', '$locationProvider',
