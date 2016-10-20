@@ -1,6 +1,10 @@
+<div id="video" ng-show="videosrc" ng-click="close()">
+  <div id="vidinfo">
+    <video autoplay="autoplay" controls="controls" id="player"></video>
+  </div>
+</div>
+
 <div ng-repeat="i in recent track by $index" class="event">
   <span class="ts" title="{{i.ts}}">[{{i.duration|duration}}] {{i.ts|relDate}} ({{i.ts|calDate}})</span>
-  <a href="{{base}}/{{i.fn}}.mp4">
-    <img src="{{base}}/{{i.fn}}.jpg"></img>
-  </a>
+  <img ng-click='play(i)' src="{{base}}/{{i.fn}}.jpg"></img>
 </div>

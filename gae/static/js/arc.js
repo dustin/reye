@@ -48,6 +48,20 @@ function homeController($scope, $http) {
     $http.get("//scenic-arc.appspot.com/api/recentImages").success(function(data) {
         $scope.recent = data;
     });
+
+    $scope.close = function() {
+        $scope.videosrc = "";
+        document.getElementById("player").innerHTML = "";
+    };
+
+    $scope.play = function(which) {
+        var url = $scope.base + "/" + which.fn + ".mp4";
+        $scope.videosrc = url;
+        var video = document.getElementById("player");
+        video.innerHTML = "<source src=\""+url+"\" type=\"video/mp4\">No Support for html5 videos.</source>";
+        video.load();
+        video.play();
+    };
 }
 
 eye.controller('IndexCtrl', ['$scope', '$http', homeController]);
