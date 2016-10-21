@@ -57,3 +57,22 @@ func fillKeyQuery(c context.Context, q *datastore.Query, results interface{}) er
 	}
 	return err
 }
+
+func loadCameras(c context.Context) (map[string]*Camera, error) {
+	rv := map[string]*Camera{}
+
+	q := datastore.NewQuery("Camera")
+	for it := q.Run(c); ; {
+		cam := &Camera{}
+		k, err := it.Next(cam)
+		if err == datastore.Done {
+			break
+		} else if err != nil {
+			return nil, err
+		}
+		cam.setKey(k)
+		camkeys[k.StringID()] = cam
+	}
+
+	return rv, nil
+}

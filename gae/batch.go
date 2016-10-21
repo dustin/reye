@@ -40,15 +40,12 @@ func handleBatchScan(w http.ResponseWriter, r *http.Request) {
 	grp, _ := errgroup.WithContext(c)
 
 	grp.Go(func() error {
-		q := datastore.NewQuery("Camera").KeysOnly()
-		for it := q.Run(c); ; {
-			k, err := it.Next(nil)
-			if err == datastore.Done {
-				break
-			} else if err != nil {
-				return err
-			}
-			camkeys[k.StringID()] = k
+		cams, err := loadCameras(c)
+		if err != nil {
+			return err
+		}
+		for _, c := range cams {
+			camkeys[c.Key.StringID()] = c.Key
 		}
 		return nil
 	})
