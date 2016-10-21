@@ -8,6 +8,7 @@ import (
 
 	"google.golang.org/appengine/datastore"
 	"google.golang.org/appengine/log"
+	"google.golang.org/appengine/memcache"
 )
 
 type Camera struct {
@@ -58,20 +59,31 @@ func fillKeyQuery(c context.Context, q *datastore.Query, results interface{}) er
 	return err
 }
 
+const camsKey = "cameras"
+
 func loadCameras(c context.Context) (map[string]*Camera, error) {
 	rv := map[string]*Camera{}
 
-	q := datastore.NewQuery("Camera")
-	for it := q.Run(c); ; {
-		cam := &Camera{}
-		k, err := it.Next(cam)
-		if err == datastore.Done {
-			break
-		} else if err != nil {
-			return nil, err
+	_, err := memcache.JSON.Get(c, camsKey, &rv)
+	if err != nil {
+		q := datastore.NewQuery("Camera")
+		for it := q.Run(c); ; {
+			cam := &Camera{}
+			k, err := it.Next(cam)
+			if err == datastore.Done {
+				break
+			} else if err != nil {
+				return nil, err
+			}
+			cam.setKey(k)
+			rv[k.StringID()] = cam
 		}
-		cam.setKey(k)
-		camkeys[k.StringID()] = cam
+
+		memcache.JSON.Set(c, &memcache.Item{
+			Key:        camsKey,
+			Object:     rv,
+			Expiration: time.Hour * 24,
+		})
 	}
 
 	return rv, nil
