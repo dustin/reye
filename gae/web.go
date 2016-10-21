@@ -73,13 +73,31 @@ func handleHome(w http.ResponseWriter, r *http.Request) {
 func handleRecentImages(w http.ResponseWriter, r *http.Request) {
 	c := appengine.NewContext(r)
 
-	rv := []Event{}
+	cams, err := loadCameras(c)
+	if err != nil {
+		log.Warningf(c, "Can't load cameras. :( %v", err)
+		cams = map[string]*Camera{}
+	}
+
+	evs := []Event{}
 
 	q := datastore.NewQuery("Event").Order("-ts").Limit(90)
-	if err := fillKeyQuery(c, q, &rv); err != nil {
+	if err := fillKeyQuery(c, q, &evs); err != nil {
 		log.Errorf(c, "Error fetching recent images: %v", err)
 		http.Error(w, err.Error(), 500)
 		return
+	}
+
+	var rv []struct {
+		Event
+		Camera *Camera
+	}
+
+	for _, e := range evs {
+		rv = append(rv, struct {
+			Event
+			Camera *Camera
+		}{e, cams[e.Camera.StringID()]})
 	}
 
 	mustEncode(c, w, r, rv)

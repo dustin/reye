@@ -12,8 +12,7 @@ import (
 )
 
 type Camera struct {
-	Name  string `json:"name" datastore:"name"`
-	Token string `json:"token" datastore:"token"`
+	Name string `json:"name" datastore:"name"`
 
 	Key *datastore.Key `datastore:"-"`
 }
