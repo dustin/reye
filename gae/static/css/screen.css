@@ -6,6 +6,10 @@ table tbody th {
     text-align: left;
 }
 
+h2.day {
+    clear: both;
+}
+
 .event {
     float: left;
 }

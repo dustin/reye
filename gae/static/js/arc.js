@@ -46,7 +46,26 @@ function homeController($scope, $http) {
     $scope.recent = [];
     $scope.base = "https://storage.cloud.google.com/scenic-arc.appspot.com/basement";
     $http.get("//scenic-arc.appspot.com/api/recentImages").success(function(data) {
-        $scope.recent = data;
+        $scope.recent = [];
+        var prev = '';
+        var current = [];
+        for (var i = 0; i < data.length; i++) {
+            var day = moment(data[i].ts).calendar(null, {
+                sameDay: '[Today] (dddd YYYY/MM/DD)',
+                nextDay: '[Tomorrow]',
+                nextWeek: 'dddd',
+                lastDay: '[Yesterday] (dddd YYYY/MM/DD)',
+                lastWeek: '[Last] dddd (YYYY/MM/DD)',
+                sameElse: 'YYYY/MM/DD'
+            });
+            if (day != prev) {
+                $scope.recent.push({ts: prev, clips: current});
+                current = [];
+            }
+            current.push(data[i]);
+            prev = day;
+        }
+        $scope.recent.push({ts: prev, clips: current});
     });
 
     $scope.close = function() {
