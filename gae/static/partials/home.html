@@ -8,6 +8,6 @@
   <h2 class="day">{{day.ts}}</h2>
   <div ng-repeat="i in day.clips track by $index" class="event">
     <span class="ts" title="{{i.ts}}">[{{i.duration|duration}}] {{i.ts|relDate}} ({{i.ts|calDate}})</span>
-    <img ng-click='play(i)' src="{{base}}/{{i.fn}}.jpg"></img>
+    <img ng-click='play(i)' src="{{base}}/{{i.Camera.name}}/{{i.fn}}.jpg"></img>
   </div>
 </div>
