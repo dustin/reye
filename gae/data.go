@@ -1,6 +1,7 @@
 package scenic
 
 import (
+	"encoding/json"
 	"reflect"
 	"time"
 
@@ -17,8 +18,17 @@ type Camera struct {
 	Key *datastore.Key `datastore:"-"`
 }
 
-func (u *Camera) setKey(to *datastore.Key) {
-	u.Key = to
+func (c *Camera) setKey(to *datastore.Key) {
+	c.Key = to
+}
+
+func (c Camera) MarshalJSON() ([]byte, error) {
+	m := map[string]interface{}{
+		"name":  c.Name,
+		"key":   c.Key.Encode(),
+		"keyid": c.Key.StringID(),
+	}
+	return json.Marshal(m)
 }
 
 type Event struct {

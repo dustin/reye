@@ -74,7 +74,7 @@ function homeController($scope, $http) {
     };
 
     $scope.play = function(which) {
-        var url = $scope.base + "/" + which.Camera.name + "/" + which.fn + ".mp4";
+        var url = $scope.base + which.Camera.keyid + "/" + which.fn + ".mp4";
         $scope.videosrc = url;
         var video = document.getElementById("player");
         video.innerHTML = "<source src=\""+url+"\" type=\"video/mp4\">No Support for html5 videos.</source>";
