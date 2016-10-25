@@ -19,10 +19,6 @@ h2.day {
     font-size: small;
 }
 
-.event img {
-    width: 320px;
-}
-
 #video {
     z-index: 9999;
     position: fixed;

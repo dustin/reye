@@ -7,7 +7,7 @@
 <div ng-repeat="day in recent">
   <h2 class="day">{{day.ts}}</h2>
   <div ng-repeat="i in day.clips track by $index" class="event">
-    <span class="ts" title="{{i.ts}}">[{{i.duration|duration}}] {{i.ts|relDate}} ({{i.ts|calDate}})</span>
-    <img ng-click='play(i)' src="{{base}}{{i.Camera.keyid}}/{{i.fn}}.jpg"></img>
+    <span class="ts" title="{{i.ts}}">{{i.ts|time}}</span>
+    <img title="[{{i.duration|duration}}] {{i.ts|relDate}} ({{i.ts|calDate}})" ng-click='play(i)' width="{{scaled(i).w}}" height="{{scaled(i).h}}" src="{{base}}{{i.Camera.keyid}}/{{i.fn}}.jpg"></img>
   </div>
 </div>

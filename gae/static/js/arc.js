@@ -27,6 +27,18 @@ eye = angular.module('eye', ['ngRoute']).
             });
         };
     }).
+    filter('time', function() {
+        return function(dstr) {
+            return moment(dstr).calendar(null, {
+                sameDay: 'HH:mm',
+                nextDay: 'HH:mm',
+                nextWeek: 'HH:mm',
+                lastDay: 'HH:mm',
+                lastWeek: 'HH:mm',
+                sameElse: 'HH:mm'
+            });
+        };
+    }).
     config(['$routeProvider', '$locationProvider',
             function($routeProvider, $locationProvider) {
                 $locationProvider.html5Mode(true);
@@ -45,7 +57,7 @@ eye = angular.module('eye', ['ngRoute']).
 function homeController($scope, $http) {
     $scope.recent = [];
     $scope.base = "https://storage.cloud.google.com/scenic-arc.appspot.com/";
-    $http.get("//scenic-arc.appspot.com/api/recentImages").success(function(data) {
+    $http.get("/api/recentImages").success(function(data) {
         $scope.recent = [];
         var prev = '';
         var current = [];
@@ -67,6 +79,13 @@ function homeController($scope, $http) {
         }
         $scope.recent.push({ts: prev, clips: current});
     });
+
+    $scope.scaled = function(i) {
+        var bw = 320;
+        var bh = 240;
+        var scale = Math.max(.1, Math.log(i.duration / 1000000000) / 8.2);
+        return {w: Math.round(bw * scale), h: Math.round(bh * scale)};
+    };
 
     $scope.close = function() {
         $scope.videosrc = "";
