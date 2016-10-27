@@ -1,4 +1,4 @@
-eye = angular.module('eye', ['ngRoute']).
+eye = angular.module('eye', ['ngRoute', 'infinite-scroll']).
     filter('relDate', function() {
         return function(dstr) {
             return moment(dstr).fromNow();
@@ -56,29 +56,42 @@ eye = angular.module('eye', ['ngRoute']).
 
 function homeController($scope, $http) {
     $scope.recent = [];
+    $scope.fetching = true;
     $scope.base = "https://storage.cloud.google.com/scenic-arc.appspot.com/";
-    $http.get("/api/recentImages").success(function(data) {
-        $scope.recent = [];
-        var prev = '';
-        var current = [];
-        for (var i = 0; i < data.length; i++) {
-            var day = moment(data[i].ts).calendar(null, {
-                sameDay: '[Today] (dddd YYYY/MM/DD)',
-                nextDay: '[Tomorrow]',
-                nextWeek: 'dddd',
-                lastDay: '[Yesterday] (dddd YYYY/MM/DD)',
-                lastWeek: '[Last] dddd (YYYY/MM/DD)',
-                sameElse: 'YYYY/MM/DD'
-            });
-            if (day != prev) {
-                $scope.recent.push({ts: prev, clips: current});
-                current = [];
+
+    var cursor = '';
+    var prev = '';
+    $scope.fetch = function() {
+        $scope.fetching = true;
+        var stuff = $scope.recent.slice();
+        console.log("fetching from", cursor);
+        $http.get("/api/recentImages?cursor=" + encodeURIComponent(cursor)).success(function(data) {
+            cursor = data.cursor;
+            console.log("Next cursor is", cursor);
+            var current = [];
+            for (var i = 0; i < data.results.length; i++) {
+                var r = data.results[i];
+                var day = moment(r.ts).calendar(null, {
+                    sameDay: '[Today] (dddd YYYY/MM/DD)',
+                    nextDay: '[Tomorrow]',
+                    nextWeek: 'dddd',
+                    lastDay: '[Yesterday] (dddd YYYY/MM/DD)',
+                    lastWeek: '[Last] dddd (YYYY/MM/DD)',
+                    sameElse: 'YYYY/MM/DD'
+                });
+                if (day != prev) {
+                    stuff.push({ts: prev, clips: current});
+                    current = [];
+                }
+                current.push(r);
+                prev = day;
             }
-            current.push(data[i]);
-            prev = day;
-        }
-        $scope.recent.push({ts: prev, clips: current});
-    });
+            stuff.push({ts: prev, clips: current});
+            $scope.recent = stuff;
+            $scope.fetching = false;
+        });
+    };
+    $scope.fetch();
 
     $scope.scaled = function(i) {
         var bw = 320;

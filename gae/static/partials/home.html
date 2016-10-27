@@ -4,10 +4,13 @@
   </div>
 </div>
 
-<div ng-repeat="day in recent">
-  <h2 class="day">{{day.ts}}</h2>
-  <div ng-repeat="i in day.clips track by $index" class="event">
-    <span class="ts" title="{{i.ts}}">{{i.ts|time}}</span>
-    <img title="[{{i.duration|duration}}] {{i.ts|relDate}} ({{i.ts|calDate}})" ng-click='play(i)' width="{{scaled(i).w}}" height="{{scaled(i).h}}" src="{{base}}{{i.Camera.keyid}}/{{i.fn}}.jpg"></img>
+
+<div infinite-scroll="fetch()" infinite-scroll-disabled="fetching" infinite-scroll-distance="1">
+  <div ng-repeat="day in recent">
+    <h2 class="day">{{day.ts}}</h2>
+    <div ng-repeat="i in day.clips track by $index" class="event">
+      <span class="ts" title="{{i.ts}}">{{i.ts|time}}</span>
+      <img title="[{{i.duration|duration}}] {{i.ts|relDate}} ({{i.ts|calDate}})" ng-click='play(i)' width="{{scaled(i).w}}" height="{{scaled(i).h}}" src="{{base}}{{i.Camera.keyid}}/{{i.fn}}.jpg"></img>
+    </div>
   </div>
 </div>

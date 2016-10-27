@@ -81,20 +81,52 @@ func handleRecentImages(w http.ResponseWriter, r *http.Request) {
 
 	evs := []Event{}
 
-	q := datastore.NewQuery("Event").Order("-ts").Limit(90)
+	q := datastore.NewQuery("Event").Order("-ts").Limit(60)
+	if cstr := r.FormValue("cursor"); cstr != "" {
+		cursor, err := datastore.DecodeCursor(cstr)
+		if err != nil {
+			http.Error(w, err.Error(), 400)
+			return
+		}
+		log.Infof(c, "Starting from cursor %v", cstr)
+		q = q.Start(cursor)
+	}
+
+	t := q.Run(c)
+	for {
+		ev := Event{}
+		k, err := t.Next(&ev)
+		if err == datastore.Done {
+			break
+		} else if err != nil {
+			http.Error(w, err.Error(), 500)
+			return
+		}
+		ev.setKey(k)
+		evs = append(evs, ev)
+	}
+
 	if err := fillKeyQuery(c, q, &evs); err != nil {
 		log.Errorf(c, "Error fetching recent images: %v", err)
 		http.Error(w, err.Error(), 500)
 		return
 	}
 
-	var rv []struct {
-		Event
-		Camera *Camera
+	cursor, err := t.Cursor()
+	if err != nil {
+		log.Warningf(c, "Error getting cursor: %v", err)
 	}
 
+	rv := struct {
+		Results []struct {
+			Event
+			Camera *Camera
+		} `json:"results"`
+		Cursor string `json:"cursor"`
+	}{Cursor: cursor.String()}
+
 	for _, e := range evs {
-		rv = append(rv, struct {
+		rv.Results = append(rv.Results, struct {
 			Event
 			Camera *Camera
 		}{e, cams[e.Camera.StringID()]})
