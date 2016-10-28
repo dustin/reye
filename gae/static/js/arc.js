@@ -61,6 +61,7 @@ function homeController($scope, $http) {
 
     var cursor = '';
     var prev = '';
+    var seen = {};
     $scope.fetch = function() {
         $scope.fetching = true;
         var stuff = $scope.recent.slice();
@@ -69,8 +70,18 @@ function homeController($scope, $http) {
             cursor = data.cursor;
             console.log("Next cursor is", cursor);
             var current = [];
+            if (stuff.length > 0) {
+                var x = stuff.pop();
+                prev = x.ts;
+                current = x.clips;
+            };
             for (var i = 0; i < data.results.length; i++) {
                 var r = data.results[i];
+                if (seen[r.ts]) {
+                    console.log("Already saw", r.ts);
+                    continue;
+                }
+                seen[r.ts] = true;
                 var day = moment(r.ts).calendar(null, {
                     sameDay: '[Today] (dddd YYYY/MM/DD)',
                     nextDay: '[Tomorrow]',
