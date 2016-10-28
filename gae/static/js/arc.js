@@ -88,7 +88,7 @@ function homeController($scope, $http) {
                     nextWeek: 'dddd',
                     lastDay: '[Yesterday] (dddd YYYY/MM/DD)',
                     lastWeek: '[Last] dddd (YYYY/MM/DD)',
-                    sameElse: 'YYYY/MM/DD'
+                    sameElse: 'dddd YYYY/MM/DD'
                 });
                 if (day != prev) {
                     stuff.push({ts: prev, clips: current});
