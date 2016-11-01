@@ -52,7 +52,7 @@ func Transcode(iname, oname string) (time.Duration, error) {
 		return 0, err
 	}
 
-	cmd := exec.Command(*ffmpeg, "-v", "warning", "-i", iname, oname)
+	cmd := exec.Command(*ffmpeg, "-y", "-v", "warning", "-i", iname, oname)
 	cmd.Stderr = os.Stderr
 	cmd.Stdout = os.Stdout
 	if err := cmd.Run(); err != nil {
