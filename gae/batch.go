@@ -80,7 +80,7 @@ func handleBatchScan(w http.ResponseWriter, r *http.Request) {
 	}
 
 	bucket := client.Bucket(bucketName)
-	log.Infof(c, "Listing bucket")
+	log.Debugf(c, "Listing bucket")
 	var keystodo []*datastore.Key
 	var valstodo []interface{}
 	todo := 0
@@ -119,7 +119,7 @@ func handleBatchScan(w http.ResponseWriter, r *http.Request) {
 
 			dur, err := time.ParseDuration(ob.Metadata["duration"])
 			if err != nil {
-				log.Warningf(c, "No duration for %v: %v", fp[0], err)
+				log.Infof(c, "No duration for %v: %v", fp[0], err)
 				continue
 			}
 			var md []struct{ K, V string }
@@ -134,7 +134,7 @@ func handleBatchScan(w http.ResponseWriter, r *http.Request) {
 			evkey := datastore.NewKey(c, "Event", pp[0]+"/"+fp[0], 0, nil)
 
 			if !evkeys[evkey.StringID()] {
-				log.Infof(c, "Adding %v in %v: %v", fp[0], camkey, t)
+				log.Debugf(c, "Adding %v in %v: %v", fp[0], camkey, t)
 
 				keystodo = append(keystodo, evkey)
 				valstodo = append(valstodo, &Event{
@@ -148,7 +148,7 @@ func handleBatchScan(w http.ResponseWriter, r *http.Request) {
 			}
 		}
 	}
-	log.Infof(c, "Completed listing of %d items", todo)
+	log.Debugf(c, "Completed listing of %d items", todo)
 
 	grp, _ = errgroup.WithContext(c)
 
@@ -163,7 +163,7 @@ func handleBatchScan(w http.ResponseWriter, r *http.Request) {
 			_, err = datastore.PutMulti(c, tk, tv)
 			return err
 		})
-		log.Infof(c, "Stored %v items", n)
+		log.Debugf(c, "Stored %v items", n)
 		keystodo = keystodo[n:]
 		valstodo = valstodo[n:]
 	}
