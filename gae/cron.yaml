@@ -3,3 +3,8 @@ cron:
   url: /batch/scan
   schedule: every 30 minutes
   timezone: US/Pacific
+
+- description: Expunge old entries
+  url: /batch/expunge
+  schedule: every 24 hours
+  timezone: US/Pacific

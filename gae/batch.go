@@ -22,6 +22,7 @@ var localTime *time.Location
 
 func init() {
 	http.HandleFunc("/batch/scan", handleBatchScan)
+	http.HandleFunc("/batch/expunge", handleBatchExpunge)
 
 	var err error
 	localTime, err = time.LoadLocation("US/Pacific")
@@ -170,6 +171,75 @@ func handleBatchScan(w http.ResponseWriter, r *http.Request) {
 
 	if err := grp.Wait(); err != nil {
 		log.Errorf(c, "Error storing items: %v", err)
+		http.Error(w, err.Error(), 500)
+		return
+	}
+
+	w.WriteHeader(204)
+}
+
+func handleBatchExpunge(w http.ResponseWriter, r *http.Request) {
+	c := appengine.NewContext(r)
+
+	var bucketName string
+	var err error
+	if bucketName, err = file.DefaultBucketName(c); err != nil {
+		log.Errorf(c, "failed to get default GCS bucket name: %v", err)
+		return
+	}
+
+	client, err := storage.NewClient(c)
+	if err != nil {
+		log.Warningf(c, "Error getting cloud store interface:  %v", err)
+		http.Error(w, "error talking to cloud store", 500)
+		return
+
+	}
+	defer client.Close()
+
+	bucket := client.Bucket(bucketName)
+
+	ts := time.Now().Add(time.Hour * 24 * -30)
+	expunging := 0
+	grp, _ := errgroup.WithContext(c)
+
+	sem := make(chan bool, 10)
+
+	q := datastore.NewQuery("Event").Filter("ts <", ts).Limit(100)
+	for it := q.Run(c); ; {
+		ev := Event{}
+		k, err := it.Next(&ev)
+		if err == datastore.Done {
+			break
+		} else if err != nil {
+			log.Errorf(c, "Error fetching events: %v", err)
+			http.Error(w, err.Error(), 500)
+			return
+		}
+		expunging++
+		grp.Go(func() error {
+			sem <- true
+			defer func() { <-sem }()
+			log.Debugf(c, "Expunging %v", ev.Filename)
+
+			exts := []string{"jpg", "mp4", "avi"}
+
+			for _, ext := range exts {
+				fn := ev.Camera.StringID() + "/" + ev.Filename + "." + ext
+				o := bucket.Object(fn)
+				if err := o.Delete(c); err != nil {
+					log.Warningf(c, "Error deleting %v: %v", fn, err)
+				}
+			}
+
+			return datastore.Delete(c, k)
+		})
+	}
+
+	log.Infof(c, "Expunging %v entries", expunging)
+
+	if err := grp.Wait(); err != nil {
+		log.Errorf(c, "Error expunging events: %v", err)
 		http.Error(w, err.Error(), 500)
 		return
 	}
