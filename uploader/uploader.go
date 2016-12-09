@@ -4,9 +4,11 @@ import (
 	"bufio"
 	"flag"
 	"fmt"
+	"io"
 	"log"
 	"log/syslog"
 	"os"
+	"path"
 	"strconv"
 	"strings"
 	"time"
@@ -16,13 +18,9 @@ import (
 	"github.com/dustin/reye/vidtool"
 
 	"cloud.google.com/go/storage"
-	"google.golang.org/api/option"
-
-	"io"
-	"path"
-
 	"golang.org/x/net/context"
 	"golang.org/x/sync/errgroup"
+	"google.golang.org/api/option"
 )
 
 const clipTimeFmt = "20060102150405"
