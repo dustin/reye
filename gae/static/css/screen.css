@@ -1,5 +1,7 @@
 body {
     font-family: verdana;
+    background: black;
+    color: white;
 }
 
 table tbody th {
