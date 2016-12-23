@@ -48,3 +48,9 @@ h2.day {
     right: 0;
     top: 0;
 }
+
+#cams {
+    position: fixed;
+    top: 0;
+    right: 0;
+}

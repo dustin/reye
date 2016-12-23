@@ -61,12 +61,14 @@ function homeController($scope, $http) {
 
     var cursor = '';
     var prev = '';
+    $scope.cam = '';
 
     $scope.fetch = function() {
         $scope.fetching = true;
         var stuff = $scope.recent.slice();
         console.log("fetching from", cursor);
-        $http.get("/api/recentImages?cursor=" + encodeURIComponent(cursor)).success(function(data) {
+        $http.get("/api/recentImages?cam=" + encodeURIComponent($scope.cam) +
+                  "&cursor=" + encodeURIComponent(cursor)).success(function(data) {
             cursor = data.cursor;
             console.log("Next cursor is", cursor);
             var current = [];
@@ -98,6 +100,17 @@ function homeController($scope, $http) {
         });
     };
     $scope.fetch();
+
+    $http.get("/api/cams").success(function(data) {
+        $scope.cams = data;
+    });
+
+    $scope.camchange = function() {
+        console.log("Cam is now", $scope.cam);
+        cursor = '';
+        $scope.recent = [];
+        $scope.fetch();
+    };
 
     $scope.scaled = function(i) {
         var bw = 320;

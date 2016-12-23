@@ -1,3 +1,10 @@
+<div id="cams">
+  <select name="cam" id="cam" ng-model="cam" ng-change="camchange()">
+    <option value="">All</option>
+    <option ng-repeat="c in cams" value="{{c.keyid}}">{{c.name}}</option>
+  </select>
+</div>
+
 <div id="video" ng-show="videosrc" ng-click="close()">
   <div id="vidinfo">
     <video autoplay="autoplay" controls="controls" id="player"></video>
