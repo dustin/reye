@@ -1,0 +1,7 @@
+indexes:
+
+- kind: Event
+  properties:
+  - name: camera
+  - name: ts
+    direction: desc
