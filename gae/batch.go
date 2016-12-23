@@ -77,6 +77,7 @@ func handleBatchScan(w http.ResponseWriter, r *http.Request) {
 	var bucketName string
 	if bucketName, err = file.DefaultBucketName(c); err != nil {
 		log.Errorf(c, "failed to get default GCS bucket name: %v", err)
+		http.Error(w, err.Error(), 500)
 		return
 	}
 
