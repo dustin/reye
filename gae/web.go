@@ -111,12 +111,6 @@ func handleRecentImages(w http.ResponseWriter, r *http.Request) {
 		evs = append(evs, ev)
 	}
 
-	if err := fillKeyQuery(c, q, &evs); err != nil {
-		log.Errorf(c, "Error fetching recent images: %v", err)
-		http.Error(w, err.Error(), 500)
-		return
-	}
-
 	cursor, err := t.Cursor()
 	if err != nil {
 		log.Warningf(c, "Error getting cursor: %v", err)
