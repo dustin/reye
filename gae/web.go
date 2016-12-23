@@ -21,6 +21,7 @@ func init() {
 	http.HandleFunc("/eye/", handleHome)
 
 	http.HandleFunc("/api/recentImages", handleRecentImages)
+	http.HandleFunc("/api/cams", handleCams)
 
 	http.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
 		http.Redirect(w, r, "/eye/", http.StatusFound)
@@ -132,4 +133,16 @@ func handleRecentImages(w http.ResponseWriter, r *http.Request) {
 	}
 
 	mustEncode(c, w, r, rv)
+}
+
+func handleCams(w http.ResponseWriter, r *http.Request) {
+	c := appengine.NewContext(r)
+
+	cams, err := loadCameras(c)
+	if err != nil {
+		http.Error(w, err.Error(), 500)
+		return
+	}
+
+	mustEncode(c, w, r, cams)
 }
