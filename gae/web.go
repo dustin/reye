@@ -79,9 +79,14 @@ func handleRecentImages(w http.ResponseWriter, r *http.Request) {
 		cams = map[string]*Camera{}
 	}
 
-	evs := []Event{}
+	var evs []Event
 
-	q := datastore.NewQuery("Event").Order("-ts").Limit(60)
+	q := datastore.NewQuery("Event")
+	if cam, ok := cams[r.FormValue("cam")]; ok {
+		q = q.Filter("camera =", cam.Key)
+	}
+
+	q = q.Order("-ts").Limit(60)
 	if cstr := r.FormValue("cursor"); cstr != "" {
 		cursor, err := datastore.DecodeCursor(cstr)
 		if err != nil {
