@@ -108,7 +108,7 @@ function homeController($scope, $http) {
     });
 
     $scope.camchange = function() {
-        console.log("Cam is now", $scope.cam);
+        console.log("Cam is now", $scope.cam ? $scope.cam : 'All');
         cursor = '';
         $scope.recent = [];
         $scope.fetch();
