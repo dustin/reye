@@ -66,7 +66,9 @@ function homeController($scope, $http) {
     $scope.fetch = function() {
         $scope.fetching = true;
         var stuff = $scope.recent.slice();
-        console.log("fetching from", cursor);
+        if (cursor) {
+            console.log("fetching from", cursor);
+        }
         $http.get("/api/recentImages?cam=" + encodeURIComponent($scope.cam) +
                   "&cursor=" + encodeURIComponent(cursor)).success(function(data) {
             cursor = data.cursor;
