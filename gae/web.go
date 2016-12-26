@@ -87,7 +87,7 @@ func handleRecentImages(w http.ResponseWriter, r *http.Request) {
 		q = q.Filter("camera =", cam.Key)
 	}
 
-	q = q.Order("-ts").Limit(60)
+	q = q.Order("-ts").Limit(100)
 	if cstr := r.FormValue("cursor"); cstr != "" {
 		cursor, err := datastore.DecodeCursor(cstr)
 		if err != nil {
