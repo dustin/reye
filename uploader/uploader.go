@@ -31,6 +31,7 @@ var (
 	authFile    = flag.String("authfile", "", "Path to auth json file")
 	interval    = flag.Duration("duration", 30*time.Second, "How frequently to rescan")
 	useSyslog   = flag.Bool("syslog", false, "Log to syslog")
+	bucketName  = flag.String("bucket", "scenic-arc.appspot.com", "your app/bucket name to store media")
 
 	basePath string
 )
@@ -69,7 +70,7 @@ func fq(fn string) string {
 func upload(ctx context.Context, sto *storage.Client, c clip) error {
 	grp, _ := errgroup.WithContext(ctx)
 
-	bucket := sto.Bucket("scenic-arc.appspot.com")
+	bucket := sto.Bucket(*bucketName)
 
 	up := func(fn string, ob *storage.ObjectHandle, attrs storage.ObjectAttrs) error {
 		defer func(t time.Time) {
