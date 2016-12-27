@@ -5,12 +5,19 @@ import (
 	"html/template"
 	"io"
 	"net/http"
+	"net/url"
+	"os"
 	"reflect"
 
 	"golang.org/x/net/context"
 	"google.golang.org/appengine"
 	"google.golang.org/appengine/datastore"
 	"google.golang.org/appengine/log"
+	"google.golang.org/appengine/taskqueue"
+)
+
+const (
+	authHdrKey = "x-reye"
 )
 
 var (
@@ -22,6 +29,7 @@ func init() {
 
 	http.HandleFunc("/api/recentImages", handleRecentImages)
 	http.HandleFunc("/api/cams", handleCams)
+	http.HandleFunc("/api/newfile", handleNewFile)
 
 	http.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
 		http.Redirect(w, r, "/eye/", http.StatusFound)
@@ -145,4 +153,19 @@ func handleCams(w http.ResponseWriter, r *http.Request) {
 	}
 
 	mustEncode(c, w, r, cams)
+}
+
+func handleNewFile(w http.ResponseWriter, r *http.Request) {
+	c := appengine.NewContext(r)
+
+	if r.Header.Get(authHdrKey) != os.Getenv("BATCH_AUTH") {
+		http.Error(w, "auth fail", 401)
+		return
+	}
+
+	if _, err := taskqueue.Add(c, taskqueue.NewPOSTTask("/batch/scan", url.Values{}), ""); err != nil {
+		log.Warningf(c, "Error queue task for batcn scan: %v", err)
+	}
+
+	w.WriteHeader(201)
 }
