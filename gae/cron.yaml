@@ -1,7 +1,7 @@
 cron:
 - description: Update the clips
   url: /batch/scan
-  schedule: every 30 minutes
+  schedule: every 12 hours
   timezone: US/Pacific
 
 - description: Expunge old entries
