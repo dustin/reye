@@ -33,6 +33,9 @@ handlers:
   static_dir: static
   secure: optional
 
+- url: /api/newfile
+  script: _go_app
+
 # Backend stuff.
 - url: /(async|batch|resend|update|admin).*
   script: _go_app
