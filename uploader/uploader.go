@@ -7,6 +7,7 @@ import (
 	"io"
 	"log"
 	"log/syslog"
+	"net/http"
 	"os"
 	"path"
 	"strconv"
@@ -15,6 +16,7 @@ import (
 	"unicode"
 
 	"github.com/dustin/go-humanize"
+	"github.com/dustin/httputil"
 	"github.com/dustin/reye/vidtool"
 
 	"cloud.google.com/go/storage"
@@ -32,6 +34,8 @@ var (
 	interval    = flag.Duration("duration", 30*time.Second, "How frequently to rescan")
 	useSyslog   = flag.Bool("syslog", false, "Log to syslog")
 	bucketName  = flag.String("bucket", "scenic-arc.appspot.com", "your app/bucket name to store media")
+	triggerAuth = flag.String("triggerAuth", "", "trigger auth token")
+	triggerURL  = flag.String("triggerURL", "", "trigger URL")
 
 	basePath string
 )
@@ -143,7 +147,29 @@ func upload(ctx context.Context, sto *storage.Client, c clip) error {
 	}
 	grp.Go(func() error { return up(c.ovid.Name(), ovob, ovattrs) })
 
-	return grp.Wait()
+	if err := grp.Wait(); err != nil {
+		return err
+	}
+
+	if *triggerURL != "" {
+		req, err := http.NewRequest("POST", *triggerURL, strings.NewReader("id="+c.ts.Format(clipTimeFmt)))
+		if err != nil {
+			return err
+		}
+		req.Header.Set("x-reye", *triggerAuth)
+		res, err := http.DefaultClient.Do(req)
+		if err != nil {
+			log.Printf("Error sending trigger: %v", err)
+			return nil
+		}
+		defer res.Body.Close()
+		if res.StatusCode != 201 {
+			log.Printf("Error executing trigger: %v", httputil.HTTPError(res))
+			return nil
+		}
+	}
+
+	return nil
 }
 
 func initStorageClient(ctx context.Context) *storage.Client {
