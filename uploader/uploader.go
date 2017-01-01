@@ -167,6 +167,8 @@ func upload(ctx context.Context, sto *storage.Client, c clip) error {
 			log.Printf("Error executing trigger: %v", httputil.HTTPError(res))
 			return nil
 		}
+
+		log.Printf("Upload notification succeeded")
 	}
 
 	return nil
