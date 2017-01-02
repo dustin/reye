@@ -320,7 +320,12 @@ func main() {
 
 	basePath = flag.Arg(0)
 
-	uploadAll(ctx, sto)
+	if err := uploadAll(ctx, sto); err != nil {
+		log.Printf("Error uploading: %v", err)
+		if *interval == 0 {
+			os.Exit(1)
+		}
+	}
 
 	if *interval > 0 {
 		for range time.Tick(*interval) {
