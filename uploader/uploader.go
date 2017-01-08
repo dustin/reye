@@ -152,7 +152,8 @@ func upload(ctx context.Context, sto *storage.Client, c clip) error {
 	}
 
 	if *triggerURL != "" {
-		req, err := http.NewRequest("POST", *triggerURL, strings.NewReader("id="+c.ts.Format(clipTimeFmt)))
+		req, err := http.NewRequest("POST", *triggerURL, strings.NewReader(
+			"cam="+*camid+"?id="+c.ts.Format(clipTimeFmt)))
 		if err != nil {
 			return err
 		}
