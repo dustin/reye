@@ -35,8 +35,8 @@ type Event struct {
 	Camera    *datastore.Key          `json:"cam_id" datastore:"camera"`
 	Timestamp time.Time               `json:"ts" datastore:"ts"`
 	Filename  string                  `json:"fn" datastore:"fn"`
-	Duration  time.Duration           `json:"duration" datastore:"duration"`
-	Metadata  []struct{ K, V string } `json:"metadata" datastore:"metadata"`
+	Duration  time.Duration           `json:"duration"`
+	Metadata  []struct{ K, V string } `json:"metadata"`
 
 	Key *datastore.Key `datastore:"-"`
 }
