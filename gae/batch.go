@@ -87,7 +87,14 @@ func handleBatchScan(w http.ResponseWriter, r *http.Request) {
 	var valstodo []interface{}
 	todo := 0
 
-	it := bucket.Objects(c, nil)
+	var oq *storage.Query
+	if r.FormValue("subdir") != "" {
+		oq = &storage.Query{
+			Delimiter: "/",
+			Prefix:    r.FormValue("subdir"),
+		}
+	}
+	it := bucket.Objects(c, oq)
 	for {
 		ob, err := it.Next()
 		if err == iterator.Done {

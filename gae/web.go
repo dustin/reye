@@ -163,8 +163,9 @@ func handleNewFile(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	if _, err := taskqueue.Add(c, taskqueue.NewPOSTTask("/batch/scan", url.Values{}), ""); err != nil {
-		log.Warningf(c, "Error queue task for batcn scan: %v", err)
+	if _, err := taskqueue.Add(c, taskqueue.NewPOSTTask("/batch/scan", url.Values{
+		"subdir": []string{r.FormValue("cam")}}), ""); err != nil {
+		log.Warningf(c, "Error queue task for batch scan: %v", err)
 	}
 
 	w.WriteHeader(201)
