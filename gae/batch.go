@@ -82,7 +82,6 @@ func handleBatchScan(w http.ResponseWriter, r *http.Request) {
 	}
 
 	bucket := client.Bucket(bucketName)
-	log.Debugf(c, "Listing bucket")
 	var keystodo []*datastore.Key
 	var valstodo []interface{}
 	todo := 0
@@ -90,10 +89,11 @@ func handleBatchScan(w http.ResponseWriter, r *http.Request) {
 	var oq *storage.Query
 	if r.FormValue("subdir") != "" {
 		oq = &storage.Query{
-			Delimiter: "/",
-			Prefix:    r.FormValue("subdir"),
+			Prefix: r.FormValue("subdir"),
 		}
 	}
+	log.Debugf(c, "Listing bucket with query %#v", oq)
+
 	it := bucket.Objects(c, oq)
 	for {
 		ob, err := it.Next()
