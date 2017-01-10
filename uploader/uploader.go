@@ -157,6 +157,7 @@ func upload(ctx context.Context, sto *storage.Client, c clip) error {
 		if err != nil {
 			return err
 		}
+		req.Header.Set("content-type", "application/x-www-form-urlencoded")
 		req.Header.Set("x-reye", *triggerAuth)
 		res, err := http.DefaultClient.Do(req)
 		if err != nil {
