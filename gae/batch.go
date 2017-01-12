@@ -1,6 +1,7 @@
 package scenic
 
 import (
+	"fmt"
 	"net/http"
 	"strings"
 
@@ -40,6 +41,8 @@ func handleBatchScan(w http.ResponseWriter, r *http.Request) {
 
 	grp, _ := errgroup.WithContext(c)
 
+	subdir := r.FormValue("subdir")
+
 	grp.Go(func() error {
 		cams, err := loadCameras(c)
 		if err != nil {
@@ -48,11 +51,19 @@ func handleBatchScan(w http.ResponseWriter, r *http.Request) {
 		for _, c := range cams {
 			camkeys[c.Key.StringID()] = c.Key
 		}
+		if _, ok := camkeys[subdir]; subdir != "" && !ok {
+			return fmt.Errorf("Requested camera %q not found in %v", subdir, camkeys)
+		}
 		return nil
 	})
 
 	grp.Go(func() error {
 		q := datastore.NewQuery("Event").KeysOnly()
+		if subdir != "" {
+			log.Debugf(c, "Limiting search to cam %v", subdir)
+			q = q.Filter("camera =", datastore.NewKey(c, "Camera", subdir, 0, nil))
+		}
+
 		for it := q.Run(c); ; {
 			k, err := it.Next(nil)
 			if err == datastore.Done {
@@ -87,9 +98,9 @@ func handleBatchScan(w http.ResponseWriter, r *http.Request) {
 	todo := 0
 
 	var oq *storage.Query
-	if r.FormValue("subdir") != "" {
+	if subdir != "" {
 		oq = &storage.Query{
-			Prefix: r.FormValue("subdir"),
+			Prefix: subdir,
 		}
 	}
 	log.Debugf(c, "Listing bucket with query %#v", oq)
