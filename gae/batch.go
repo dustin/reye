@@ -54,6 +54,7 @@ func handleBatchScan(w http.ResponseWriter, r *http.Request) {
 		if _, ok := camkeys[subdir]; subdir != "" && !ok {
 			return fmt.Errorf("Requested camera %q not found in %v", subdir, camkeys)
 		}
+		log.Debugf(c, "Loaded %v cameras", len(camkeys))
 		return nil
 	})
 
@@ -73,6 +74,7 @@ func handleBatchScan(w http.ResponseWriter, r *http.Request) {
 			}
 			evkeys[k.StringID()] = true
 		}
+		log.Debugf(c, "Loaded %v evkeys events", len(evkeys))
 		return nil
 	})
 
