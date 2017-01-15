@@ -74,7 +74,7 @@ func handleBatchScan(w http.ResponseWriter, r *http.Request) {
 			}
 			evkeys[k.StringID()] = true
 		}
-		log.Debugf(c, "Loaded %v evkeys events", len(evkeys))
+		log.Debugf(c, "Loaded %v events", len(evkeys))
 		return nil
 	})
 
