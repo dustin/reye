@@ -12,6 +12,7 @@ import (
 	"google.golang.org/appengine/memcache"
 )
 
+// Camera represents a physical camera capturing content.
 type Camera struct {
 	Name string `json:"name" datastore:"name"`
 
@@ -22,6 +23,7 @@ func (c *Camera) setKey(to *datastore.Key) {
 	c.Key = to
 }
 
+// MarshalJSON JSONifies cameras.
 func (c Camera) MarshalJSON() ([]byte, error) {
 	m := map[string]interface{}{
 		"name":  c.Name,
@@ -31,6 +33,7 @@ func (c Camera) MarshalJSON() ([]byte, error) {
 	return json.Marshal(m)
 }
 
+// An Event represents all of the details of a time when motion was detected.
 type Event struct {
 	Camera    *datastore.Key          `json:"cam_id" datastore:"camera"`
 	Timestamp time.Time               `json:"ts" datastore:"ts"`
@@ -45,6 +48,7 @@ func (u *Event) setKey(to *datastore.Key) {
 	u.Key = to
 }
 
+// Keyable entities can have their keys set via fillKeyQuery
 type Keyable interface {
 	setKey(*datastore.Key)
 }
