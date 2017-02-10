@@ -1,20 +1,19 @@
 package main
 
 import (
+	"context"
 	"flag"
 	"fmt"
 	"io"
 	"log"
+	"net/url"
 	"os"
 	"time"
-
-	"net/url"
 
 	"github.com/dustin/go-humanize"
 	"github.com/dustin/reye/vidtool"
 
 	"cloud.google.com/go/storage"
-	"golang.org/x/net/context"
 	"golang.org/x/sync/errgroup"
 	"google.golang.org/api/iterator"
 	"google.golang.org/api/option"
@@ -121,7 +120,7 @@ func getOrigDuration(ctx context.Context, bucket *storage.BucketHandle, c *clip)
 	}
 	defer tmpf.Close()
 	defer os.Remove(oname)
-	dur, err := vidtool.ClipDuration(oname)
+	dur, err := vidtool.ClipDuration(ctx, oname)
 	if err != nil {
 		return 0, err
 	}
@@ -161,7 +160,7 @@ func transcode(ctx context.Context, bucket *storage.BucketHandle, c *clip) error
 		return err
 	}
 
-	idur, err := vidtool.ClipDuration(iname)
+	idur, err := vidtool.ClipDuration(ctx, iname)
 	if err != nil {
 		return err
 	}
@@ -191,7 +190,7 @@ func transcode(ctx context.Context, bucket *storage.BucketHandle, c *clip) error
 		}
 	}
 
-	odur, err := vidtool.Transcode(iname, oname)
+	odur, err := vidtool.Transcode(ctx, iname, oname)
 	defer os.Remove(oname)
 	if err != nil {
 		return err

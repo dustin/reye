@@ -2,6 +2,7 @@ package main
 
 import (
 	"bufio"
+	"context"
 	"flag"
 	"fmt"
 	"io"
@@ -20,7 +21,6 @@ import (
 	"github.com/dustin/reye/vidtool"
 
 	"cloud.google.com/go/storage"
-	"golang.org/x/net/context"
 	"golang.org/x/sync/errgroup"
 	"google.golang.org/api/option"
 )
@@ -103,7 +103,7 @@ func upload(ctx context.Context, sto *storage.Client, c clip) error {
 
 	grp.Go(func() error {
 		oname := c.ts.Format(clipTimeFmt) + ".mp4"
-		odur, err := vidtool.Transcode(fq(c.ovid.Name()), fq(oname))
+		odur, err := vidtool.Transcode(ctx, fq(c.ovid.Name()), fq(oname))
 		if err != nil {
 			return err
 		}
@@ -132,7 +132,7 @@ func upload(ctx context.Context, sto *storage.Client, c clip) error {
 	}
 	grp.Go(func() error { return up(c.thumb.Name(), tob, tattrs) })
 
-	dur, err := vidtool.ClipDuration(fq(c.ovid.Name()))
+	dur, err := vidtool.ClipDuration(ctx, fq(c.ovid.Name()))
 	if err != nil {
 		return err
 	}

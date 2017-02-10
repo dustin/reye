@@ -1,6 +1,7 @@
 package vidtool
 
 import (
+	"context"
 	"encoding/json"
 	"flag"
 	"fmt"
@@ -15,12 +16,12 @@ var (
 	ffmpeg  = flag.String("ffmpeg", "ffmpeg", "path to ffmpeg")
 )
 
-func ClipDuration(fn string) (time.Duration, error) {
+func ClipDuration(ctx context.Context, fn string) (time.Duration, error) {
 	printfmt := "-print_format"
 	if strings.HasSuffix(*ffprobe, "avprobe") {
 		printfmt = "-of"
 	}
-	cmd := exec.Command(*ffprobe, "-v", "error", printfmt, "json", "-show_format", fn)
+	cmd := exec.CommandContext(ctx, *ffprobe, "-v", "error", printfmt, "json", "-show_format", fn)
 	cmd.Stderr = os.Stderr
 	o, err := cmd.Output()
 	if err != nil {
@@ -46,20 +47,20 @@ func abs(d time.Duration) time.Duration {
 	return d
 }
 
-func Transcode(iname, oname string) (time.Duration, error) {
-	idur, err := ClipDuration(iname)
+func Transcode(ctx context.Context, iname, oname string) (time.Duration, error) {
+	idur, err := ClipDuration(ctx, iname)
 	if err != nil {
 		return 0, err
 	}
 
-	cmd := exec.Command(*ffmpeg, "-y", "-v", "warning", "-i", iname, oname)
+	cmd := exec.CommandContext(ctx, *ffmpeg, "-y", "-v", "warning", "-i", iname, oname)
 	cmd.Stderr = os.Stderr
 	cmd.Stdout = os.Stdout
 	if err := cmd.Run(); err != nil {
 		return 0, err
 	}
 
-	odur, err := ClipDuration(oname)
+	odur, err := ClipDuration(ctx, oname)
 	if err != nil {
 		return 0, err
 	}
