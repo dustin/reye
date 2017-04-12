@@ -12,8 +12,10 @@ import (
 )
 
 var (
-	ffprobe = flag.String("ffprobe", "ffprobe", "path to ffprobe")
-	ffmpeg  = flag.String("ffmpeg", "ffmpeg", "path to ffmpeg")
+	ffprobe          = flag.String("ffprobe", "ffprobe", "path to ffprobe")
+	ffmpeg           = flag.String("ffmpeg", "ffmpeg", "path to ffmpeg")
+	maxDurationDrift = flag.Duration("max_duration_drift", 5*time.Second,
+		"maximum acceptable duration drift when transcoding videos")
 )
 
 func ClipDuration(ctx context.Context, fn string) (time.Duration, error) {
@@ -65,7 +67,7 @@ func Transcode(ctx context.Context, iname, oname string) (time.Duration, error) 
 		return 0, err
 	}
 
-	if abs(odur-idur) > time.Second {
+	if abs(odur-idur) > *maxDurationDrift {
 		return 0, fmt.Errorf("durations inconsistent, in=%v, out=%v", idur, odur)
 	}
 
