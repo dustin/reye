@@ -245,10 +245,7 @@ func parseDetails(fn string) (int, map[string]string, error) {
 func uploadSnapshot(ctx context.Context, sto *storage.Client) error {
 	bucket := sto.Bucket(*bucketName)
 
-	fn := path.Join(*camid, "lastsnap.jpg")
-	defer os.Remove(fn)
-
-	ovob := bucket.Object(fn)
+	ovob := bucket.Object(path.Join(*camid, "lastsnap.jpg"))
 	ovattrs := storage.ObjectAttrs{
 		ContentType: "image/jpeg",
 		Metadata: map[string]string{
@@ -279,6 +276,7 @@ func uploadAll(ctx context.Context, sto *storage.Client) error {
 			if err := uploadSnapshot(ctx, sto); err != nil {
 				log.Printf("Error uploading the latest snapshot: %v", err)
 			}
+			os.Remove(dname)
 		} else if strings.HasSuffix(dname, ".details") {
 			id, details, err := parseDetails(dname)
 			if err != nil {
