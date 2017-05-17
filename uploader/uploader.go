@@ -19,6 +19,7 @@ import (
 	"github.com/dustin/go-humanize"
 	"github.com/dustin/httputil"
 	"github.com/dustin/reye/vidtool"
+	"github.com/dustin/yellow"
 
 	"cloud.google.com/go/storage"
 	"golang.org/x/sync/errgroup"
@@ -72,9 +73,7 @@ func fq(fn string) string {
 }
 
 func uploadOne(ctx context.Context, fn string, c clip, ob *storage.ObjectHandle, attrs storage.ObjectAttrs) error {
-	defer func(t time.Time) {
-		log.Printf("Finished uploading %v in %v", fn, time.Since(t))
-	}(time.Now())
+	defer yellow.DeadlineLog(time.Second, "Uploading %v", fn).Done()
 
 	f, err := os.Open(fq(fn))
 	if err != nil {
