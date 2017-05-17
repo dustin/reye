@@ -275,6 +275,7 @@ func uploadAll(ctx context.Context, sto *storage.Client) error {
 			// Upload the latest snapshot separately
 			if err := uploadSnapshot(ctx, sto); err != nil {
 				log.Printf("Error uploading the latest snapshot: %v", err)
+				continue
 			}
 			os.Remove(fq(dname))
 		} else if strings.HasSuffix(dname, ".details") {
