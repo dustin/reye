@@ -255,7 +255,7 @@ func uploadSnapshot(ctx context.Context, sto *storage.Client) error {
 			"camera": *camid,
 		},
 	}
-	return uploadOne(ctx, fn, clip{}, ovob, ovattrs)
+	return uploadOne(ctx, "lastsnap.jpg", clip{}, ovob, ovattrs)
 }
 
 func uploadAll(ctx context.Context, sto *storage.Client) error {
