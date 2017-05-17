@@ -103,6 +103,10 @@ function homeController($scope, $http) {
     };
     $scope.fetch();
 
+    $scope.snapshot = function(cam) {
+        return $scope.base + cam.keyid + "/lastsnap.jpg?ts=" + new Date().getTime();
+    };
+
     $http.get("/api/cams").success(function(data) {
         $scope.cams = data;
     });

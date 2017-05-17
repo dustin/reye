@@ -21,6 +21,10 @@ h2.day {
     font-size: small;
 }
 
+#snapshots figure {
+    display: inline-block;
+}
+
 #video {
     z-index: 9999;
     position: fixed;
