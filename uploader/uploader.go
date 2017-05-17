@@ -243,6 +243,9 @@ func parseDetails(fn string) (int, map[string]string, error) {
 }
 
 func uploadSnapshot(ctx context.Context, sto *storage.Client) error {
+	ctx, cancel := context.WithTimeout(ctx, time.Second*5)
+	defer cancel()
+
 	bucket := sto.Bucket(*bucketName)
 
 	ovob := bucket.Object(path.Join(*camid, "lastsnap.jpg"))
