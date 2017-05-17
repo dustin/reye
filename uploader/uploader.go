@@ -267,6 +267,8 @@ func uploadAll(ctx context.Context, sto *storage.Client) error {
 
 	clips := map[int]clip{}
 
+	var snaps []string
+
 	for _, dent := range dents {
 		dname := dent.Name()
 		if dname[0] == '.' {
@@ -301,8 +303,7 @@ func uploadAll(ctx context.Context, sto *storage.Client) error {
 			clips[id] = c
 		} else if strings.HasSuffix(dname, "-snapshot.jpg") {
 			// just a snapshot, will handle separately.
-			log.Printf("Deleting snapshot file: %v", fq(dname))
-			os.Remove(fq(dname))
+			snaps = append(snaps, fq(dname))
 		} else if strings.HasSuffix(dname, ".jpg") {
 			id, _, err := parseClipInfo(dname)
 			if err != nil {
@@ -312,6 +313,11 @@ func uploadAll(ctx context.Context, sto *storage.Client) error {
 			c.thumb = dent
 			clips[id] = c
 		}
+	}
+
+	for _, s := range snaps {
+		log.Printf("Deleting %v", s)
+		os.Remove(s)
 	}
 
 	for id, clip := range clips {
