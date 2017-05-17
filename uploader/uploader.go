@@ -279,7 +279,7 @@ func uploadAll(ctx context.Context, sto *storage.Client) error {
 				log.Printf("Error uploading the latest snapshot: %v", err)
 				continue
 			}
-			os.Remove(fq(dname))
+			snaps = append(snaps, fq(dname))
 		} else if strings.HasSuffix(dname, ".details") {
 			id, details, err := parseDetails(dname)
 			if err != nil {
@@ -316,8 +316,9 @@ func uploadAll(ctx context.Context, sto *storage.Client) error {
 	}
 
 	for _, s := range snaps {
-		log.Printf("Deleting %v", s)
-		os.Remove(s)
+		if err := os.Remove(s); err != nil {
+			log.Printf("Error deleting %q: %v", s, err)
+		}
 	}
 
 	for id, clip := range clips {
