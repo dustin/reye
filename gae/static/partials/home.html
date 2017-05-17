@@ -13,7 +13,7 @@
 
 <div id="snapshots">
   <figure ng-repeat="c in cams">
-    <img width="320" height="240" src="{{snapshot(c)}}" alt="last {{c.name}}" />
+    <img width="320" height="240" ng-src="{{snapshot(c)}}" alt="last {{c.name}}" />
     <figcaption>{{c.name}}</figcaption>
   </figure>
 </div>

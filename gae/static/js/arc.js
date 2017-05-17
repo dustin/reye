@@ -54,7 +54,7 @@ eye = angular.module('eye', ['ngRoute', 'infinite-scroll']).
                     });
             }]);
 
-function homeController($scope, $http) {
+function homeController($scope, $http, $interval) {
     $scope.recent = [];
     $scope.fetching = true;
     $scope.base = "https://storage.cloud.google.com/scenic-arc.appspot.com/";
@@ -103,8 +103,18 @@ function homeController($scope, $http) {
     };
     $scope.fetch();
 
+    /* Timestamp management for last snap images. */
+    $scope.ts = new Date().getTime();
+    $scope.refresh = function() {
+        $scope.ts = new Date().getTime();
+    };
+    $scope.stoprefresh = $interval($scope.refresh, 20000);
+    $scope.$on('$destroy', function() {
+        $scope.stoprefresh();
+    });
+
     $scope.snapshot = function(cam) {
-        return $scope.base + cam.keyid + "/lastsnap.jpg?ts=" + new Date().getTime();
+        return $scope.base + cam.keyid + "/lastsnap.jpg?ts=" + $scope.ts;
     };
 
     $http.get("/api/cams").success(function(data) {
@@ -141,4 +151,4 @@ function homeController($scope, $http) {
     };
 }
 
-eye.controller('IndexCtrl', ['$scope', '$http', homeController]);
+eye.controller('IndexCtrl', ['$scope', '$http', '$interval', homeController]);
