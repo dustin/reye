@@ -250,7 +250,7 @@ func uploadSnapshot(ctx context.Context, sto *storage.Client) error {
 
 	ovob := bucket.Object(fn)
 	ovattrs := storage.ObjectAttrs{
-		ContentType: "video/avi",
+		ContentType: "image/jpeg",
 		Metadata: map[string]string{
 			"camera": *camid,
 		},
@@ -259,11 +259,6 @@ func uploadSnapshot(ctx context.Context, sto *storage.Client) error {
 }
 
 func uploadAll(ctx context.Context, sto *storage.Client) error {
-	// Upload the latest snapshot first
-	if err := uploadSnapshot(ctx, sto); err != nil {
-		log.Printf("Error uploading the latest snapshot: %v", err)
-	}
-
 	d, err := os.Open(basePath)
 	if err != nil {
 		return err
@@ -280,7 +275,10 @@ func uploadAll(ctx context.Context, sto *storage.Client) error {
 		if dname[0] == '.' {
 			// ignore dot files
 		} else if dname == "lastsnap.jpg" {
-			// ignore the last snapshot (handled separately)
+			// Upload the latest snapshot separately
+			if err := uploadSnapshot(ctx, sto); err != nil {
+				log.Printf("Error uploading the latest snapshot: %v", err)
+			}
 		} else if strings.HasSuffix(dname, ".details") {
 			id, details, err := parseDetails(dname)
 			if err != nil {
