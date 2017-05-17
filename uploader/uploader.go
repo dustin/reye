@@ -71,35 +71,35 @@ func fq(fn string) string {
 	return path.Join(basePath, fn)
 }
 
+func uploadOne(ctx context.Context, fn string, c clip, ob *storage.ObjectHandle, attrs storage.ObjectAttrs) error {
+	defer func(t time.Time) {
+		log.Printf("Finished uploading %v in %v", fn, time.Since(t))
+	}(time.Now())
+
+	f, err := os.Open(fq(fn))
+	if err != nil {
+		return err
+	}
+	w := ob.NewWriter(ctx)
+	w.ObjectAttrs.ContentType = attrs.ContentType
+	w.ObjectAttrs.Metadata = map[string]string{}
+	for k, v := range c.details {
+		w.ObjectAttrs.Metadata[k] = v
+	}
+	for k, v := range attrs.Metadata {
+		w.ObjectAttrs.Metadata[k] = v
+	}
+	_, err = io.Copy(w, f)
+	if err != nil {
+		return err
+	}
+	return w.Close()
+}
+
 func upload(ctx context.Context, sto *storage.Client, c clip) error {
 	grp, _ := errgroup.WithContext(ctx)
 
 	bucket := sto.Bucket(*bucketName)
-
-	up := func(fn string, ob *storage.ObjectHandle, attrs storage.ObjectAttrs) error {
-		defer func(t time.Time) {
-			log.Printf("Finished uploading %v in %v", fn, time.Since(t))
-		}(time.Now())
-
-		f, err := os.Open(fq(fn))
-		if err != nil {
-			return err
-		}
-		w := ob.NewWriter(ctx)
-		w.ObjectAttrs.ContentType = attrs.ContentType
-		w.ObjectAttrs.Metadata = map[string]string{}
-		for k, v := range c.details {
-			w.ObjectAttrs.Metadata[k] = v
-		}
-		for k, v := range attrs.Metadata {
-			w.ObjectAttrs.Metadata[k] = v
-		}
-		_, err = io.Copy(w, f)
-		if err != nil {
-			return err
-		}
-		return w.Close()
-	}
 
 	grp.Go(func() error {
 		oname := c.ts.Format(clipTimeFmt) + ".mp4"
@@ -118,7 +118,7 @@ func upload(ctx context.Context, sto *storage.Client, c clip) error {
 				"duration": odur.String(),
 			},
 		}
-		return up(oname, vob, vattrs)
+		return uploadOne(ctx, oname, c, vob, vattrs)
 
 	})
 
@@ -130,7 +130,7 @@ func upload(ctx context.Context, sto *storage.Client, c clip) error {
 			"camera":   *camid,
 		},
 	}
-	grp.Go(func() error { return up(c.thumb.Name(), tob, tattrs) })
+	grp.Go(func() error { return uploadOne(ctx, c.thumb.Name(), c, tob, tattrs) })
 
 	dur, err := vidtool.ClipDuration(ctx, fq(c.ovid.Name()))
 	if err != nil {
@@ -145,7 +145,7 @@ func upload(ctx context.Context, sto *storage.Client, c clip) error {
 			"duration": dur.String(),
 		},
 	}
-	grp.Go(func() error { return up(c.ovid.Name(), ovob, ovattrs) })
+	grp.Go(func() error { return uploadOne(ctx, c.ovid.Name(), c, ovob, ovattrs) })
 
 	if err := grp.Wait(); err != nil {
 		return err
@@ -242,7 +242,28 @@ func parseDetails(fn string) (int, map[string]string, error) {
 	return id, parseMap(f), nil
 }
 
+func uploadSnapshot(ctx context.Context, sto *storage.Client) error {
+	bucket := sto.Bucket(*bucketName)
+
+	fn := path.Join(*camid, "lastsnap.jpg")
+	defer os.Remove(fn)
+
+	ovob := bucket.Object(fn)
+	ovattrs := storage.ObjectAttrs{
+		ContentType: "video/avi",
+		Metadata: map[string]string{
+			"camera": *camid,
+		},
+	}
+	return uploadOne(ctx, fn, clip{}, ovob, ovattrs)
+}
+
 func uploadAll(ctx context.Context, sto *storage.Client) error {
+	// Upload the latest snapshot first
+	if err := uploadSnapshot(ctx, sto); err != nil {
+		log.Printf("Error uploading the latest snapshot: %v", err)
+	}
+
 	d, err := os.Open(basePath)
 	if err != nil {
 		return err
@@ -279,6 +300,10 @@ func uploadAll(ctx context.Context, sto *storage.Client) error {
 			c.ovid = dent
 			c.ts = ts
 			clips[id] = c
+		} else if strings.HasSuffix(dname, "-snapshot.jpg") {
+			// just a snapshot, will handle separately.
+			log.Printf("Deleting snapshot file: %v", fq(dname))
+			os.Remove(fq(dname))
 		} else if strings.HasSuffix(dname, ".jpg") {
 			id, _, err := parseClipInfo(dname)
 			if err != nil {
