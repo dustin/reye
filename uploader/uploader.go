@@ -279,6 +279,8 @@ func uploadAll(ctx context.Context, sto *storage.Client) error {
 		dname := dent.Name()
 		if dname[0] == '.' {
 			// ignore dot files
+		} else if dname == "lastsnap.jpg" {
+			// ignore the last snapshot (handled separately)
 		} else if strings.HasSuffix(dname, ".details") {
 			id, details, err := parseDetails(dname)
 			if err != nil {
