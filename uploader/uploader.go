@@ -88,11 +88,10 @@ func uploadOne(ctx context.Context, fn string, c clip, ob *storage.ObjectHandle,
 
 	// Just hang up if we don't get at least 12kBps.
 	deadline := (5 * time.Second) + estimateTime(int(st.Size()), 12000)
-
-	if deadline < time.Second {
-		deadline = time.Second
+	if deadline > time.Minute {
+		log.Printf("Might take a bit for %v (deadline is %v)", fn, deadline)
 	}
-	defer yellow.DeadlineLogWarn(deadline, "Uploading %v", fn).Done()
+	defer yellow.DeadlineLogWarn(deadline*3/4, "Uploading %v", fn).Done()
 	ctx, cancel := context.WithTimeout(ctx, deadline)
 	defer cancel()
 
