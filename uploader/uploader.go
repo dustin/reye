@@ -282,7 +282,7 @@ func uploadAll(ctx context.Context, sto *storage.Client) error {
 				log.Printf("Error reading snapshot name: %v", err)
 				continue
 			}
-			os.Remove(fq(dname))
+			snaps = append(snaps, fq(dname))
 			if err := uploadSnapshot(ctx, sto, sn); err != nil {
 				log.Printf("Error uploading the latest snapshot: %v", err)
 				continue
