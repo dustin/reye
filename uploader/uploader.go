@@ -88,7 +88,7 @@ func uploadOne(ctx context.Context, fn string, c clip, ob *storage.ObjectHandle,
 
 	// Just hang up if we don't get at least 12kBps.
 	deadline := (5 * time.Second) + estimateTime(int(st.Size()), 12000)
-	if deadline > time.Minute {
+	if deadline > 10*time.Minute {
 		log.Printf("Might take a bit for %v (deadline is %v)", fn, deadline)
 	}
 	defer yellow.DeadlineLogWarn(deadline*3/4, "Uploading %v", fn).Done()
@@ -184,8 +184,6 @@ func upload(ctx context.Context, sto *storage.Client, c clip) error {
 			log.Printf("Error executing trigger: %v", httputil.HTTPError(res))
 			return nil
 		}
-
-		log.Printf("Upload notification succeeded")
 	}
 
 	return nil
