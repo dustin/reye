@@ -73,12 +73,24 @@ func fq(fn string) string {
 }
 
 func uploadOne(ctx context.Context, fn string, c clip, ob *storage.ObjectHandle, attrs storage.ObjectAttrs) error {
-	defer yellow.DeadlineLog(time.Second, "Uploading %v", fn).Done()
-
 	f, err := os.Open(fq(fn))
 	if err != nil {
 		return err
 	}
+	st, err := f.Stat()
+	if err != nil {
+		log.Printf("Can't stat file... not sure how to deadline...: %v", err)
+	}
+
+	// Deadline after an average of 25k/s
+	deadline := (time.Duration(st.Size()) * time.Second) / 25000
+	if deadline < time.Second {
+		deadline = time.Second
+	}
+	defer yellow.DeadlineLogWarn(deadline, "Uploading %v", fn).Done()
+	ctx, cancel := context.WithTimeout(ctx, deadline)
+	defer cancel()
+
 	w := ob.NewWriter(ctx)
 	w.ObjectAttrs.ContentType = attrs.ContentType
 	w.ObjectAttrs.Metadata = map[string]string{}
