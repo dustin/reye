@@ -166,26 +166,35 @@ func upload(ctx context.Context, sto *storage.Client, c clip) error {
 		return err
 	}
 
-	if *triggerURL != "" {
-		req, err := http.NewRequest("POST", *triggerURL, strings.NewReader(
-			"cam="+*camid+"&id="+c.ts.Format(clipTimeFmt)))
-		if err != nil {
-			return err
-		}
-		req.Header.Set("content-type", "application/x-www-form-urlencoded")
-		req.Header.Set("x-reye", *triggerAuth)
-		res, err := http.DefaultClient.Do(req)
-		if err != nil {
-			log.Printf("Error sending trigger: %v", err)
-			return nil
-		}
-		defer res.Body.Close()
-		if res.StatusCode != 201 {
-			log.Printf("Error executing trigger: %v", httputil.HTTPError(res))
-			return nil
-		}
+	if err := notifyUpload(ctx, c); err != nil {
+		log.Printf("Error triggering notification: %v", err)
 	}
 
+	return nil
+}
+
+func notifyUpload(ctx context.Context, c clip) error {
+	ctx, cancel := context.WithTimeout(ctx, time.Second)
+	defer cancel()
+
+	if *triggerURL == "" {
+		return nil
+	}
+	req, err := http.NewRequest("POST", *triggerURL, strings.NewReader(
+		"cam="+*camid+"&id="+c.ts.Format(clipTimeFmt)))
+	if err != nil {
+		return err
+	}
+	req.Header.Set("content-type", "application/x-www-form-urlencoded")
+	req.Header.Set("x-reye", *triggerAuth)
+	res, err := http.DefaultClient.Do(req)
+	if err != nil {
+		return err
+	}
+	defer res.Body.Close()
+	if res.StatusCode != 201 {
+		return httputil.HTTPError(res)
+	}
 	return nil
 }
 
