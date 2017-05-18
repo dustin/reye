@@ -411,8 +411,6 @@ func main() {
 				}
 			}
 		}()
-		for range time.Tick(*interval) {
-		}
 
 		if err := uploadClips(ctx, sto); err != nil {
 			log.Printf("Error uploading: %v", err)
@@ -422,8 +420,10 @@ func main() {
 		}
 
 		if *interval > 0 {
-			if err := uploadClips(ctx, sto); err != nil {
-				log.Printf("Error uploading stuff: %v", err)
+			for range time.Tick(*interval) {
+				if err := uploadClips(ctx, sto); err != nil {
+					log.Printf("Error uploading stuff: %v", err)
+				}
 			}
 		}
 	}
