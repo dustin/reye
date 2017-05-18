@@ -226,7 +226,7 @@ func handleBatchExpunge(w http.ResponseWriter, r *http.Request) {
 
 	sem := make(chan bool, 10)
 
-	q := datastore.NewQuery("Event").Filter("ts <", ts).Limit(100)
+	q := datastore.NewQuery("Event").Filter("ts <", ts).Limit(500)
 	for it := q.Run(c); ; {
 		ev := Event{}
 		k, err := it.Next(&ev)

@@ -6,5 +6,5 @@ cron:
 
 - description: Expunge old entries
   url: /batch/expunge
-  schedule: every 24 hours
+  schedule: every 12 hours
   timezone: US/Pacific
