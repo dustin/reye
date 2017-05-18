@@ -257,7 +257,7 @@ func uploadSnapshot(ctx context.Context, sto *storage.Client, sn string) error {
 	return uploadOne(ctx, sn, clip{}, ovob, ovattrs)
 }
 
-func uploadAll(ctx context.Context, sto *storage.Client) error {
+func uploadSnapshots(ctx context.Context, sto *storage.Client) error {
 	d, err := os.Open(basePath)
 	if err != nil {
 		return err
@@ -267,15 +267,12 @@ func uploadAll(ctx context.Context, sto *storage.Client) error {
 		return err
 	}
 
-	clips := map[int]clip{}
-
 	var snaps []string
 
 	for _, dent := range dents {
 		dname := dent.Name()
-		if dname[0] == '.' {
-			// ignore dot files
-		} else if dname == "lastsnap.jpg" {
+
+		if dname == "lastsnap.jpg" {
 			// Upload the latest snapshot separately
 			sn, err := os.Readlink(fq(dname))
 			if err != nil {
@@ -287,6 +284,39 @@ func uploadAll(ctx context.Context, sto *storage.Client) error {
 				log.Printf("Error uploading the latest snapshot: %v", err)
 				continue
 			}
+		} else if strings.HasSuffix(dname, "-snapshot.jpg") {
+			// Gather a snapshot to delete after this loop.
+			snaps = append(snaps, fq(dname))
+		}
+	}
+
+	for _, s := range snaps {
+		if err := os.Remove(s); err != nil {
+			log.Printf("Error deleting %q: %v", s, err)
+		}
+	}
+
+	return nil
+}
+
+func uploadClips(ctx context.Context, sto *storage.Client) error {
+	d, err := os.Open(basePath)
+	if err != nil {
+		return err
+	}
+	dents, err := d.Readdir(-1)
+	if err != nil {
+		return err
+	}
+
+	clips := map[int]clip{}
+
+	for _, dent := range dents {
+		dname := dent.Name()
+		if dname[0] == '.' {
+			// ignore dot files
+		} else if dname == "lastsnap.jpg" || strings.HasSuffix(dname, "-snapshot.jpg") {
+			// ignore snaps
 		} else if strings.HasSuffix(dname, ".details") {
 			id, details, err := parseDetails(dname)
 			if err != nil {
@@ -308,9 +338,6 @@ func uploadAll(ctx context.Context, sto *storage.Client) error {
 			c.ovid = dent
 			c.ts = ts
 			clips[id] = c
-		} else if strings.HasSuffix(dname, "-snapshot.jpg") {
-			// just a snapshot, will handle separately.
-			snaps = append(snaps, fq(dname))
 		} else if strings.HasSuffix(dname, ".jpg") {
 			id, _, err := parseClipInfo(dname)
 			if err != nil {
@@ -319,12 +346,6 @@ func uploadAll(ctx context.Context, sto *storage.Client) error {
 			c := clips[id]
 			c.thumb = dent
 			clips[id] = c
-		}
-	}
-
-	for _, s := range snaps {
-		if err := os.Remove(s); err != nil {
-			log.Printf("Error deleting %q: %v", s, err)
 		}
 	}
 
@@ -360,7 +381,14 @@ func main() {
 
 	basePath = flag.Arg(0)
 
-	if err := uploadAll(ctx, sto); err != nil {
+	if err := uploadSnapshots(ctx, sto); err != nil {
+		log.Printf("Error uploading snaps: %v", err)
+		if *interval == 0 {
+			os.Exit(1)
+		}
+	}
+
+	if err := uploadClips(ctx, sto); err != nil {
 		log.Printf("Error uploading: %v", err)
 		if *interval == 0 {
 			os.Exit(1)
@@ -368,8 +396,15 @@ func main() {
 	}
 
 	if *interval > 0 {
+		go func() {
+			for range time.Tick(*interval) {
+				if err := uploadSnapshots(ctx, sto); err != nil {
+					log.Printf("Error uploading snaps: %v", err)
+				}
+			}
+		}()
 		for range time.Tick(*interval) {
-			if err := uploadAll(ctx, sto); err != nil {
+			if err := uploadClips(ctx, sto); err != nil {
 				log.Printf("Error uploading stuff: %v", err)
 			}
 		}
