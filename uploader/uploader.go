@@ -72,6 +72,10 @@ func fq(fn string) string {
 	return path.Join(basePath, fn)
 }
 
+func estimateTime(size, kbps int) time.Duration {
+	return time.Duration(size) * time.Second / time.Duration(kbps)
+}
+
 func uploadOne(ctx context.Context, fn string, c clip, ob *storage.ObjectHandle, attrs storage.ObjectAttrs) error {
 	f, err := os.Open(fq(fn))
 	if err != nil {
@@ -82,8 +86,9 @@ func uploadOne(ctx context.Context, fn string, c clip, ob *storage.ObjectHandle,
 		log.Printf("Can't stat file... not sure how to deadline...: %v", err)
 	}
 
-	// Deadline after an average of 25k/s
-	deadline := (time.Duration(st.Size()) * time.Second) / 25000
+	// Just hang up if we don't get at least 12kBps.
+	deadline := (5 * time.Second) + estimateTime(int(st.Size()), 12000)
+
 	if deadline < time.Second {
 		deadline = time.Second
 	}
