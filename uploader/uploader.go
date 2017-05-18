@@ -241,7 +241,7 @@ func parseDetails(fn string) (int, map[string]string, error) {
 	return id, parseMap(f), nil
 }
 
-func uploadSnapshot(ctx context.Context, sto *storage.Client) error {
+func uploadSnapshot(ctx context.Context, sto *storage.Client, sn string) error {
 	ctx, cancel := context.WithTimeout(ctx, time.Second*5)
 	defer cancel()
 
@@ -254,7 +254,7 @@ func uploadSnapshot(ctx context.Context, sto *storage.Client) error {
 			"camera": *camid,
 		},
 	}
-	return uploadOne(ctx, "lastsnap.jpg", clip{}, ovob, ovattrs)
+	return uploadOne(ctx, sn, clip{}, ovob, ovattrs)
 }
 
 func uploadAll(ctx context.Context, sto *storage.Client) error {
@@ -277,11 +277,16 @@ func uploadAll(ctx context.Context, sto *storage.Client) error {
 			// ignore dot files
 		} else if dname == "lastsnap.jpg" {
 			// Upload the latest snapshot separately
-			if err := uploadSnapshot(ctx, sto); err != nil {
+			sn, err := os.Readlink(fq(dname))
+			if err != nil {
+				log.Printf("Error reading snapshot name: %v", err)
+				continue
+			}
+			os.Remove(fq(dname))
+			if err := uploadSnapshot(ctx, sto, sn); err != nil {
 				log.Printf("Error uploading the latest snapshot: %v", err)
 				continue
 			}
-			snaps = append(snaps, fq(dname))
 		} else if strings.HasSuffix(dname, ".details") {
 			id, details, err := parseDetails(dname)
 			if err != nil {
