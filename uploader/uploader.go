@@ -386,6 +386,24 @@ func uploadClips(ctx context.Context, sto *storage.Client) error {
 	return nil
 }
 
+func repeatedly(ctx context.Context, sto *storage.Client, name string, f func(context.Context, *storage.Client) error) error {
+	if err := f(ctx, sto); err != nil {
+		return err
+	}
+
+	if *interval > 0 {
+		go func() {
+			for range time.Tick(*interval) {
+				if err := f(ctx, sto); err != nil {
+					log.Printf("%v error: %v", name, err)
+				}
+			}
+		}()
+	}
+
+	return nil
+}
+
 func main() {
 	flag.Parse()
 
@@ -404,35 +422,11 @@ func main() {
 
 	basePath = flag.Arg(0)
 
-	if err := uploadSnapshots(ctx, sto); err != nil {
-		log.Printf("Error uploading snaps: %v", err)
-		if *interval == 0 {
-			os.Exit(1)
-		}
-	}
-	if *interval > 0 {
-		go func() {
-			for range time.Tick(*interval) {
-				if err := uploadSnapshots(ctx, sto); err != nil {
-					log.Printf("Error uploading snaps: %v", err)
-				}
-			}
-		}()
-
-		if err := uploadClips(ctx, sto); err != nil {
-			log.Printf("Error uploading: %v", err)
-			if *interval == 0 {
-				os.Exit(1)
-			}
-		}
-
-		if *interval > 0 {
-			for range time.Tick(*interval) {
-				if err := uploadClips(ctx, sto); err != nil {
-					log.Printf("Error uploading stuff: %v", err)
-				}
-			}
-		}
+	if err := repeatedly(ctx, sto, "upload snaps", uploadSnapshots); err != nil {
+		log.Fatalf("Could not do initial snapshot upload: %v", err)
 	}
 
+	if err := repeatedly(ctx, sto, "upload clips", uploadClips); err != nil {
+		log.Printf("Could not do initial cilp upload: %v", err)
+	}
 }
