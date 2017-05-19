@@ -50,7 +50,7 @@ func handleBatchScanAll(w http.ResponseWriter, r *http.Request) {
 	for _, cam := range cams {
 		cam := cam
 		grp.Go(func() error {
-			log.Infof("Requesting scan of %v", cam.Key.StringID())
+			log.Infof(c, "Requesting scan of %v", cam.Key.StringID())
 			_, err := taskqueue.Add(c, taskqueue.NewPOSTTask("/batch/scan", url.Values{"subdir": []string{cam.Key.StringID()}}), "")
 			return err
 		})
@@ -147,6 +147,8 @@ func handleBatchScan(w http.ResponseWriter, r *http.Request) {
 		}
 		if err != nil {
 			log.Errorf(c, "Error iterating bucket: %v", err)
+			http.Error(w, err.Error(), 500)
+			return
 		}
 		if ob.ContentType == "video/mp4" {
 			// basement/20161013173815.jpg
