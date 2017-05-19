@@ -223,7 +223,7 @@ func handleBatchScan(w http.ResponseWriter, r *http.Request) {
 	camkeys := map[string]*datastore.Key{}
 	evkeys := map[string]bool{}
 
-	grp, _ := errgroup.WithContext(c)
+	grp := errgroup.Group{}
 
 	subdir := r.FormValue("subdir")
 
@@ -358,7 +358,7 @@ func handleBatchScan(w http.ResponseWriter, r *http.Request) {
 	}
 	log.Debugf(c, "Completed listing of %d items", todo)
 
-	grp, _ = errgroup.WithContext(c)
+	grp = errgroup.Group{}
 
 	for len(keystodo) > 0 {
 		n := len(keystodo)
@@ -408,7 +408,7 @@ func handleBatchExpunge(w http.ResponseWriter, r *http.Request) {
 
 	ts := time.Now().Add(time.Hour * 24 * -30)
 	expunging := 0
-	grp, _ := errgroup.WithContext(c)
+	grp := errgroup.Group{}
 
 	sem := make(chan bool, 10)
 

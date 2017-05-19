@@ -112,7 +112,7 @@ func uploadOne(ctx context.Context, fn string, c clip, ob *storage.ObjectHandle,
 }
 
 func upload(ctx context.Context, sto *storage.Client, c clip) error {
-	grp, _ := errgroup.WithContext(ctx)
+	grp := errgroup.Group{}
 
 	bucket := sto.Bucket(*bucketName)
 

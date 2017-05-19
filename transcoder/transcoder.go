@@ -136,7 +136,7 @@ func getOrigDuration(ctx context.Context, bucket *storage.BucketHandle, c *clip)
 }
 
 func transcode(ctx context.Context, bucket *storage.BucketHandle, c *clip) error {
-	grp, _ := errgroup.WithContext(ctx)
+	grp := errgroup.Group{}
 
 	log.Printf("Transcoding %v", c)
 	start := time.Now()
@@ -223,7 +223,7 @@ func transcode(ctx context.Context, bucket *storage.BucketHandle, c *clip) error
 }
 
 func filter(ctx context.Context, bucket *storage.BucketHandle, clips []*clip) chan *clip {
-	grp, _ := errgroup.WithContext(ctx)
+	grp := errgroup.Group{}
 
 	ch := make(chan *clip)
 	sem := make(chan bool, *filterConcurrency)
