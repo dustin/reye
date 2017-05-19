@@ -264,20 +264,35 @@ func parseDetails(fn string) (int, map[string]string, error) {
 	return id, parseMap(f), nil
 }
 
-func uploadSnapshot(ctx context.Context, sto *storage.Client, sn string) error {
+func uploadSnapshot(ctx context.Context, sto *storage.Client, sn string, ts time.Time) error {
 	ctx, cancel := context.WithTimeout(ctx, time.Second*5)
 	defer cancel()
 
 	bucket := sto.Bucket(*bucketName)
 
-	ovob := bucket.Object(path.Join(*camid, "lastsnap.jpg"))
+	ovob := bucket.Object(path.Join("snaps", *camid, ts.Format(clipTimeFmt)+".jpg"))
 	ovattrs := storage.ObjectAttrs{
 		ContentType: "image/jpeg",
 		Metadata: map[string]string{
-			"camera": *camid,
+			"camera":   *camid,
+			"captured": ts.Format(time.RFC3339),
 		},
 	}
-	return uploadOne(ctx, sn, clip{}, ovob, ovattrs)
+	if err := uploadOne(ctx, sn, clip{}, ovob, ovattrs); err != nil {
+		return err
+	}
+
+	last := bucket.Object(path.Join(*camid, "lastsnap.jpg"))
+	_, err := last.CopierFrom(ovob).Run(ctx)
+	return err
+}
+
+func parseSnapshotTime(f string) (time.Time, error) {
+	a := strings.Split(f, "-")
+	if len(a) < 2 {
+		return time.Time{}, fmt.Errorf("Invalid snapshot filename: %v", f)
+	}
+	return time.ParseInLocation(clipTimeFmt, a[1], time.Local)
 }
 
 func uploadSnapshots(ctx context.Context, sto *storage.Client) error {
@@ -302,8 +317,13 @@ func uploadSnapshots(ctx context.Context, sto *storage.Client) error {
 				log.Printf("Error reading snapshot name: %v", err)
 				continue
 			}
+			ts, err := parseSnapshotTime(sn)
+			if err != nil {
+				log.Printf("Error parsing snapshot timestamp: %v", err)
+				continue
+			}
 			snaps = append(snaps, fq(dname))
-			if err := uploadSnapshot(ctx, sto, sn); err != nil {
+			if err := uploadSnapshot(ctx, sto, sn, ts); err != nil {
 				log.Printf("Error uploading the latest snapshot: %v", err)
 				continue
 			}
