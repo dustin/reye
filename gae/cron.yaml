@@ -1,6 +1,6 @@
 cron:
 - description: Update the clips
-  url: /batch/scan
+  url: /batch/scanAll
   schedule: every 24 hours
   timezone: US/Pacific
 

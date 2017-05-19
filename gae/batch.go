@@ -3,6 +3,7 @@ package scenic
 import (
 	"fmt"
 	"net/http"
+	"net/url"
 	"strings"
 
 	"golang.org/x/sync/errgroup"
@@ -15,6 +16,7 @@ import (
 	"google.golang.org/appengine/datastore"
 	"google.golang.org/appengine/file"
 	"google.golang.org/appengine/log"
+	"google.golang.org/appengine/taskqueue"
 )
 
 const clipTimeFmt = "20060102150405"
@@ -23,6 +25,7 @@ var localTime *time.Location
 
 func init() {
 	http.HandleFunc("/batch/scan", handleBatchScan)
+	http.HandleFunc("/batch/scanAll", handleBatchScanAll)
 	http.HandleFunc("/batch/expunge", handleBatchExpunge)
 
 	var err error
@@ -31,6 +34,35 @@ func init() {
 		// ... do something
 		localTime = time.Local
 	}
+}
+
+func handleBatchScanAll(w http.ResponseWriter, r *http.Request) {
+	c := appengine.NewContext(r)
+	cams, err := loadCameras(c)
+	if err != nil {
+		log.Warningf(c, "Error listing cameras:  %v", err)
+		http.Error(w, "error listing cameras", 500)
+		return
+	}
+
+	grp := errgroup.Group{}
+
+	for _, cam := range cams {
+		cam := cam
+		grp.Go(func() error {
+			log.Infof("Requesting scan of %v", cam.Key.StringID())
+			_, err := taskqueue.Add(c, taskqueue.NewPOSTTask("/batch/scan", url.Values{"subdir": []string{cam.Key.StringID()}}), "")
+			return err
+		})
+	}
+
+	if err := grp.Wait(); err != nil {
+		log.Warningf(c, "Error queueing batch scans:  %v", err)
+		http.Error(w, "error queueing batch scans", 500)
+		return
+	}
+
+	w.WriteHeader(204)
 }
 
 func handleBatchScan(w http.ResponseWriter, r *http.Request) {
