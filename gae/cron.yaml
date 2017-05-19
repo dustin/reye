@@ -4,6 +4,11 @@ cron:
   schedule: every 24 hours
   timezone: US/Pacific
 
+- description: Scan the snapshots
+  url: /batch/scanSnaps
+  schedule: every 1 hours
+  timezone: US/Pacific
+
 - description: Expunge old entries
   url: /batch/expunge
   schedule: every 12 hours

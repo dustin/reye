@@ -19,13 +19,17 @@ import (
 	"google.golang.org/appengine/taskqueue"
 )
 
-const clipTimeFmt = "20060102150405"
+const (
+	clipTimeFmt = "20060102150405"
+	maxSnapAge  = time.Hour
+)
 
 var localTime *time.Location
 
 func init() {
 	http.HandleFunc("/batch/scan", handleBatchScan)
 	http.HandleFunc("/batch/scanAll", handleBatchScanAll)
+	http.HandleFunc("/batch/scanSnaps", handleBatchScanSnaps)
 	http.HandleFunc("/batch/expunge", handleBatchExpunge)
 
 	var err error
@@ -34,6 +38,119 @@ func init() {
 		// ... do something
 		localTime = time.Local
 	}
+}
+
+func handleBatchScanSnaps(w http.ResponseWriter, r *http.Request) {
+	c := appengine.NewContext(r)
+
+	camgrp := errgroup.Group{}
+	camkeys := map[string]*datastore.Key{}
+
+	camgrp.Go(func() error {
+		cams, err := loadCameras(c)
+		if err != nil {
+			return err
+		}
+		for _, c := range cams {
+			camkeys[c.Key.StringID()] = c.Key
+		}
+		log.Debugf(c, "Loaded %v cameras", len(camkeys))
+		return nil
+	})
+
+	client, err := storage.NewClient(c)
+	if err != nil {
+		log.Warningf(c, "Error getting cloud store interface:  %v", err)
+		http.Error(w, "error talking to cloud store", 500)
+		return
+
+	}
+	defer client.Close()
+
+	var bucketName string
+	if bucketName, err = file.DefaultBucketName(c); err != nil {
+		log.Errorf(c, "failed to get default GCS bucket name: %v", err)
+		http.Error(w, err.Error(), 500)
+		return
+	}
+
+	bucket := client.Bucket(bucketName)
+
+	oq := &storage.Query{
+		Prefix: "__snaps",
+	}
+	log.Debugf(c, "Listing bucket with query %#v", oq)
+
+	grp := errgroup.Group{}
+	sem := make(chan bool, 10)
+	deleting := 0
+
+	recents := map[string]time.Time{}
+
+	it := bucket.Objects(c, oq)
+	for {
+		ob, err := it.Next()
+		if err == iterator.Done {
+			break
+		}
+		if err != nil {
+			log.Errorf(c, "Error iterating bucket: %v", err)
+			http.Error(w, err.Error(), 500)
+			return
+		}
+
+		// Before we proceed, we should have our cameras loaded.
+		if err := camgrp.Wait(); err != nil {
+			log.Errorf(c, "Failed to initialize cams and stuff: %v", err)
+			http.Error(w, err.Error(), 500)
+			return
+		}
+
+		// __snaps/basement/20170518205540.jpg
+		pp := strings.Split(ob.Name, "/")
+		/*
+			camkey, ok := camkeys[pp[1]]
+			if !ok {
+				log.Warningf(c, "Unhandled key: %v from %v", pp[1], ob.Name)
+				continue
+			}
+		*/
+		fp := strings.Split(pp[2], ".")
+		t, err := time.Parse(time.RFC3339, ob.Metadata["captured"])
+		if err != nil {
+			t, err = time.ParseInLocation(clipTimeFmt, fp[0], localTime)
+			if err != nil {
+				log.Infof(c, "Failed to parse time in %v: %v", ob.Name, err)
+				continue
+			}
+		}
+
+		if recents[pp[1]].Before(t) {
+			recents[pp[1]] = t
+		}
+
+		if time.Since(t) > maxSnapAge {
+			deleting++
+			grp.Go(func() error {
+				sem <- true
+				defer func() { <-sem }()
+				log.Debugf(c, "Deleting %v (%v old)", ob.Name, time.Since(t))
+				return bucket.Object(ob.Name).Delete(c)
+			})
+		}
+	}
+
+	log.Infof(c, "Deleting %v snapshots.", deleting)
+	for k, v := range recents {
+		log.Infof(c, "Most recent %v: %v (%v ago)", k, v, time.Since(v))
+	}
+
+	if err := grp.Wait(); err != nil {
+		log.Errorf(c, "Error deleting snapshots: %v", err)
+		http.Error(w, err.Error(), 500)
+		return
+	}
+
 }
 
 func handleBatchScanAll(w http.ResponseWriter, r *http.Request) {
