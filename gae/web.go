@@ -8,6 +8,7 @@ import (
 	"net/url"
 	"os"
 	"reflect"
+	"time"
 
 	"golang.org/x/net/context"
 	"google.golang.org/appengine"
@@ -21,7 +22,11 @@ const (
 )
 
 var (
-	templates = template.Must(template.New("").ParseGlob("templates/*"))
+	templates = template.Must(template.New("").Funcs(map[string]interface{}{
+		"age": func(t time.Time) string {
+			return time.Since(t).String()
+		},
+	}).ParseGlob("templates/*"))
 )
 
 func init() {

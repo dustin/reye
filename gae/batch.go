@@ -1,11 +1,13 @@
 package scenic
 
 import (
+	"bytes"
 	"fmt"
 	"net/http"
 	"net/url"
 	"strings"
 
+	"golang.org/x/net/context"
 	"golang.org/x/sync/errgroup"
 
 	"time"
@@ -16,12 +18,14 @@ import (
 	"google.golang.org/appengine/datastore"
 	"google.golang.org/appengine/file"
 	"google.golang.org/appengine/log"
+	"google.golang.org/appengine/mail"
 	"google.golang.org/appengine/taskqueue"
 )
 
 const (
-	clipTimeFmt = "20060102150405"
-	maxSnapAge  = time.Hour
+	clipTimeFmt    = "20060102150405"
+	maxSnapAge     = time.Hour
+	snapWarningAge = time.Minute * 25
 )
 
 var localTime *time.Location
@@ -141,8 +145,18 @@ func handleBatchScanSnaps(w http.ResponseWriter, r *http.Request) {
 	}
 
 	log.Infof(c, "Deleting %v snapshots.", deleting)
+	var notify []string
 	for k, v := range recents {
 		log.Infof(c, "Most recent %v: %v (%v ago)", k, v, time.Since(v))
+		if time.Since(v) > snapWarningAge {
+			notify = append(notify, k)
+		}
+	}
+
+	if len(notify) > 0 {
+		grp.Go(func() error {
+			return notifyOldCams(c, notify, recents)
+		})
 	}
 
 	if err := grp.Wait(); err != nil {
@@ -151,6 +165,27 @@ func handleBatchScanSnaps(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+}
+
+func notifyOldCams(ctx context.Context, cams []string, recents map[string]time.Time) error {
+	m := map[string]time.Time{}
+	for _, k := range cams {
+		m[k] = recents[k]
+	}
+
+	buf := &bytes.Buffer{}
+	if err := templates.ExecuteTemplate(buf, "oldsnaps.txt", m); err != nil {
+		return err
+	}
+
+	msg := &mail.Message{
+		Sender:  "Dustin Sallings <dsallings@gmail.com>",
+		To:      []string{"dustin@sallings.org"},
+		Subject: "Camera Not Snapshotting",
+		Body:    string(buf.Bytes()),
+	}
+	log.Infof(ctx, "Sending:\n%s\n", msg.Body)
+	return mail.Send(ctx, msg)
 }
 
 func handleBatchScanAll(w http.ResponseWriter, r *http.Request) {

@@ -1,0 +1,3 @@
+{{ range $cam, $t := . }}
+    {{ $cam }} last seen {{ $t }} ({{$t | age}} ago)
+{{ end }}
