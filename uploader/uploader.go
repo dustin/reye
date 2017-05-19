@@ -449,4 +449,8 @@ func main() {
 	if err := repeatedly(ctx, sto, "upload clips", uploadClips); err != nil {
 		log.Printf("Could not do initial cilp upload: %v", err)
 	}
+
+	if *interval > 0 {
+		select {}
+	}
 }
