@@ -270,7 +270,7 @@ func uploadSnapshot(ctx context.Context, sto *storage.Client, sn string, ts time
 
 	bucket := sto.Bucket(*bucketName)
 
-	ovob := bucket.Object(path.Join("snaps", *camid, ts.Format(clipTimeFmt)+".jpg"))
+	ovob := bucket.Object(path.Join("__snaps", *camid, ts.Format(clipTimeFmt)+".jpg"))
 	ovattrs := storage.ObjectAttrs{
 		ContentType: "image/jpeg",
 		Metadata: map[string]string{
