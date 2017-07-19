@@ -37,6 +37,7 @@ var (
 	bucketName  = flag.String("bucket", "scenic-arc.appspot.com", "your app/bucket name to store media")
 	triggerAuth = flag.String("triggerAuth", "", "trigger auth token")
 	triggerURL  = flag.String("triggerURL", "", "trigger URL")
+	deleteDays  = flag.Int("delete_days", 7, "delete files that have been here more than this many days")
 
 	basePath string
 )
@@ -293,6 +294,30 @@ func parseSnapshotTime(f string) (time.Time, error) {
 		return time.Time{}, fmt.Errorf("Invalid snapshot filename: %v", f)
 	}
 	return time.ParseInLocation(clipTimeFmt, a[1], time.Local)
+}
+
+func removeOldFiles(ctx context.Context, sto *storage.Client) error {
+	d, err := os.Open(basePath)
+	if err != nil {
+		return err
+	}
+	defer d.Close()
+	dents, err := d.Readdir(-1)
+	if err != nil {
+		return err
+	}
+
+	for _, dent := range dents {
+		if age := time.Since(dent.ModTime()); age > time.Duration(*deleteDays)*time.Hour*24 {
+			dname := dent.Name()
+			log.Printf("Removing file %v for being too old (%v was %v ago)", dname, dent.ModTime(), age)
+			if err := os.Remove(fq(dname)); err != nil {
+				log.Printf("Error deleting %v: %v", fq(dname), err)
+			}
+		}
+	}
+
+	return nil
 }
 
 func uploadSnapshots(ctx context.Context, sto *storage.Client) error {
