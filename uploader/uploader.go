@@ -469,6 +469,10 @@ func main() {
 
 	basePath = flag.Arg(0)
 
+	if err := repeatedly(ctx, sto, "delete old files", removeOldFiles); err != nil {
+		log.Fatalf("Could not do initial old file deletion: %v", err)
+	}
+
 	if err := repeatedly(ctx, sto, "upload snaps", uploadSnapshots); err != nil {
 		log.Fatalf("Could not do initial snapshot upload: %v", err)
 	}
