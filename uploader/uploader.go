@@ -300,6 +300,7 @@ func uploadSnapshots(ctx context.Context, sto *storage.Client) error {
 	if err != nil {
 		return err
 	}
+	defer d.Close()
 	dents, err := d.Readdir(-1)
 	if err != nil {
 		return err
@@ -347,6 +348,7 @@ func uploadClips(ctx context.Context, sto *storage.Client) error {
 	if err != nil {
 		return err
 	}
+	defer d.Close()
 	dents, err := d.Readdir(-1)
 	if err != nil {
 		return err
