@@ -7,7 +7,7 @@ import (
 	"net/url"
 	"strings"
 
-	"golang.org/x/net/context"
+	"context"
 	"golang.org/x/sync/errgroup"
 
 	"time"
