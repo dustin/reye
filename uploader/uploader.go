@@ -38,6 +38,7 @@ var (
 	triggerAuth = flag.String("triggerAuth", "", "trigger auth token")
 	triggerURL  = flag.String("triggerURL", "", "trigger URL")
 	deleteDays  = flag.Int("delete_days", 7, "delete files that have been here more than this many days")
+	snapTimeout = flag.Duration("snapshot_timeout", 5*time.Second, "deadline for uploading a snapshot image")
 
 	basePath string
 )
@@ -266,7 +267,7 @@ func parseDetails(fn string) (int, map[string]string, error) {
 }
 
 func uploadSnapshot(ctx context.Context, sto *storage.Client, sn string, ts time.Time) error {
-	ctx, cancel := context.WithTimeout(ctx, time.Second*5)
+	ctx, cancel := context.WithTimeout(ctx, *snapTimeout)
 	defer cancel()
 
 	bucket := sto.Bucket(*bucketName)
